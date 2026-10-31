@@ -1,0 +1,11 @@
+xcuserdata/
+
+*.hmap
+
+timeline.xctimeline
+playground.xcworkspace
+
+build/
+.claude/
+.trash/*
+release/
