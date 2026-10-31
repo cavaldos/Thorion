@@ -9,3 +9,5 @@ build/
 .claude/
 .trash/*
 release/
+
+.DS_Store

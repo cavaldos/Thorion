@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5EF859C85D209CAA68ACC224 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB83B3037CE0C6604019EF1B /* Cocoa.framework */; };
 		A6638F812F1C0FD60047FA8E /* Defaults in Frameworks */ = {isa = PBXBuildFile; productRef = A6638F802F1C0FD60047FA8E /* Defaults */; };
 		A66D62D92F44069300B996E7 /* smc_power.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A66D62CE2F44067C00B996E7 /* smc_power.framework */; };
 		A66D62DD2F44069900B996E7 /* smc_power.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A66D62CE2F44067C00B996E7 /* smc_power.framework */; };
@@ -18,6 +19,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		74424263215E24ACE5FEF379 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A68B3E042F19AB4B00F115E4 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A68B3E0B2F19AB4B00F115E4;
+			remoteInfo = thorion;
+		};
 		A66D62DB2F44069300B996E7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A68B3E042F19AB4B00F115E4 /* Project object */;
@@ -97,6 +105,8 @@
 		A68B3E0C2F19AB4B00F115E4 /* thorion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = thorion.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A68B3E1E2F19ABCB00F115E4 /* helper.xpc */ = {isa = PBXFileReference; explicitFileType = "wrapper.xpc-service"; includeInIndex = 0; path = helper.xpc; sourceTree = BUILT_PRODUCTS_DIR; };
 		A6E6D71E2F39DD350069CF9F /* charging-helper */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "charging-helper"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E390A14B4C82DAC55180C784 /* ThorionTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ThorionTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		FB83B3037CE0C6604019EF1B /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -117,13 +127,24 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		461187499E81910AB659BE66 /* ThorionTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = ThorionTests;
+			sourceTree = "<group>";
+		};
 		A66D62CF2F44067C00B996E7 /* SMCPower */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = SMCPower;
 			sourceTree = "<group>";
 		};
 		A68B3E0E2F19AB4B00F115E4 /* Thorion */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Thorion;
 			sourceTree = "<group>";
 		};
@@ -179,9 +200,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B87A011972B9213EA061DB5E /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5EF859C85D209CAA68ACC224 /* Cocoa.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3B662F14E4D422972C4A8A8A /* OS X */ = {
+			isa = PBXGroup;
+			children = (
+				FB83B3037CE0C6604019EF1B /* Cocoa.framework */,
+			);
+			name = "OS X";
+			sourceTree = "<group>";
+		};
 		A68B3E032F19AB4B00F115E4 = {
 			isa = PBXGroup;
 			children = (
@@ -192,6 +229,7 @@
 				A66D62CF2F44067C00B996E7 /* SMCPower */,
 				A68B3E532F1A942600F115E4 /* Frameworks */,
 				A68B3E0D2F19AB4B00F115E4 /* Products */,
+				461187499E81910AB659BE66 /* ThorionTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -202,6 +240,7 @@
 				A68B3E1E2F19ABCB00F115E4 /* helper.xpc */,
 				A6E6D71E2F39DD350069CF9F /* charging-helper */,
 				A66D62CE2F44067C00B996E7 /* smc_power.framework */,
+				E390A14B4C82DAC55180C784 /* ThorionTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -209,6 +248,7 @@
 		A68B3E532F1A942600F115E4 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				3B662F14E4D422972C4A8A8A /* OS X */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -226,6 +266,27 @@
 /* End PBXHeadersBuildPhase section */
 
 /* Begin PBXNativeTarget section */
+		A09C8BAE9F1A28AF9121AC8D /* ThorionTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 025F27B698D7370CCBD8F442 /* Build configuration list for PBXNativeTarget "ThorionTests" */;
+			buildPhases = (
+				E5859497959E91C88BE716C0 /* Sources */,
+				B87A011972B9213EA061DB5E /* Frameworks */,
+				6BDEEE52EA83F926CD11BEF7 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CD13AF34D192C0494733AD3F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				461187499E81910AB659BE66 /* ThorionTests */,
+			);
+			name = ThorionTests;
+			productName = ThorionTests;
+			productReference = E390A14B4C82DAC55180C784 /* ThorionTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		A66D62CD2F44067C00B996E7 /* smc-power */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A66D62D62F44067C00B996E7 /* Build configuration list for PBXNativeTarget "smc-power" */;
@@ -297,8 +358,6 @@
 				A68B3E1F2F19ABCB00F115E4 /* Helper */,
 			);
 			name = helper;
-			packageProductDependencies = (
-			);
 			productName = helper;
 			productReference = A68B3E1E2F19ABCB00F115E4 /* helper.xpc */;
 			productType = "com.apple.product-type.xpc-service";
@@ -319,8 +378,6 @@
 				A6E6D71F2F39DD350069CF9F /* ChargingHelper */,
 			);
 			name = "charging-helper";
-			packageProductDependencies = (
-			);
 			productName = "charging-helper";
 			productReference = A6E6D71E2F39DD350069CF9F /* charging-helper */;
 			productType = "com.apple.product-type.tool";
@@ -349,7 +406,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A68B3E072F19AB4B00F115E4 /* Build configuration list for PBXProject "thorion" */;
+			buildConfigurationList = A68B3E072F19AB4B00F115E4 /* Build configuration list for PBXProject "Thorion" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -376,11 +433,19 @@
 				A68B3E1D2F19ABCB00F115E4 /* helper */,
 				A6E6D71D2F39DD350069CF9F /* charging-helper */,
 				A66D62CD2F44067C00B996E7 /* smc-power */,
+				A09C8BAE9F1A28AF9121AC8D /* ThorionTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		6BDEEE52EA83F926CD11BEF7 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A66D62CC2F44067C00B996E7 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -452,6 +517,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E5859497959E91C88BE716C0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -480,9 +552,30 @@
 			target = A6E6D71D2F39DD350069CF9F /* charging-helper */;
 			targetProxy = A6E6D7302F3A00000069CF9F /* PBXContainerItemProxy */;
 		};
+		CD13AF34D192C0494733AD3F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = thorion;
+			target = A68B3E0B2F19AB4B00F115E4 /* thorion */;
+			targetProxy = 74424263215E24ACE5FEF379 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		8091A676DD7DBA94D992F431 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.thorion.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/thorion.app/Contents/MacOS/thorion";
+			};
+			name = Debug;
+		};
 		A66D62D72F44067C00B996E7 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -895,9 +988,33 @@
 			};
 			name = Release;
 		};
+		BAE08E20F9C493BD426F0E09 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.thorion.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/thorion.app/Contents/MacOS/thorion";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		025F27B698D7370CCBD8F442 /* Build configuration list for PBXNativeTarget "ThorionTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BAE08E20F9C493BD426F0E09 /* Release */,
+				8091A676DD7DBA94D992F431 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A66D62D62F44067C00B996E7 /* Build configuration list for PBXNativeTarget "smc-power" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -907,7 +1024,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A68B3E072F19AB4B00F115E4 /* Build configuration list for PBXProject "thorion" */ = {
+		A68B3E072F19AB4B00F115E4 /* Build configuration list for PBXProject "Thorion" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A68B3E152F19AB4C00F115E4 /* Debug */,

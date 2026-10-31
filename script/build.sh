@@ -134,4 +134,4 @@ echo ""
 echo -e "Size: ${GREEN}$(ls -lh "$DMG_PATH" | awk '{print $5}')${NC}"
 echo ""
 
-open "$RELEASE_DIR"
+[ -n "${CI:-}" ] || open "$RELEASE_DIR"

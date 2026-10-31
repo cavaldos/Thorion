@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SIGN_ARGS: CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: spm-
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Thorion.xcodeproj \
+            -scheme thorion \
+            -destination 'platform=macOS,arch=arm64' \
+            -resultBundlePath TestResults.xcresult \
+            $SIGN_ARGS | tee xcodebuild.log
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            TestResults.xcresult
+            xcodebuild.log
+
+  build-release:
+    name: Release build (DMG)
+    runs-on: macos-26
+    timeout-minutes: 30
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build DMG
+        run: ./script/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Thorion-dmg
+          path: release/Thorion.dmg
+          retention-days: 7
+
+  shellcheck:
+    name: Lint shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck -S warning script/*.sh
