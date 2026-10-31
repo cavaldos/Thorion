@@ -57,17 +57,16 @@ It regenerates every size in `Thorion/Assets.xcassets/AppIcon.appiconset` (16 â†
 ## Every release (2 commands)
 
 ```bash
-# 1. Commit your work, then build the DMG, tag, and upload a DRAFT release
+# 1. Commit your work, then build the DMG, tag, and publish it as the LATEST release
 ./script/release.sh vX.Y.Z
 
-# 2. After testing the draft's DMG, publish it and bump the Homebrew cask
+# 2. Bump the Homebrew cask
 ./script/notify-update.sh vX.Y.Z
 ```
 
-What step 2 does:
-
-- **Publishes the release.** Installed apps check `releases/latest` on GitHub once a day and show a notification that links to the download. Drafts are invisible to that check, which is why step 1 creates one.
-- **Updates `cavaldos/homebrew-tap`.** Writes `Casks/thorion.rb` with the new version and SHA-256, so `brew upgrade` picks it up. Pass `--skip-brew` to only publish the release.
+- **Step 1 publishes the release as Latest** (same as Ice). Installed apps check `releases/latest` on GitHub once a day and show a notification that links to the download.
+- **Step 2 updates Homebrew.** It also publishes the release if it is still a draft (e.g. old drafts).
+  It writes `Casks/thorion.rb` in `cavaldos/homebrew-tap` with the new version and SHA-256, so `brew upgrade` picks it up. Pass `--skip-brew` to skip it.
 
 ### Tag rules
 

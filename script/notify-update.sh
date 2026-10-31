@@ -1,5 +1,5 @@
 #!/bin/bash
-# Step 2: publish the draft release and bump the Homebrew cask, so users hear about it.
+# Step 2: make sure the release is the latest one and bump the Homebrew cask.
 #   - Installed apps poll GitHub's "latest release" daily and show a notification.
 #   - Homebrew users get the new version with `brew upgrade`.
 # Usage: ./script/notify-update.sh vX.Y.Z [--skip-brew]
@@ -29,13 +29,13 @@ fi
 command -v gh >/dev/null || { echo "missing gh — brew install gh"; exit 1; }
 VERSION="${TAG#v}"
 
-echo "[1/2] Publishing release $TAG..."
+echo "[1/2] Checking release $TAG..."
 IS_DRAFT=$(gh release view "$TAG" --repo "$REPOSITORY" --json isDraft --jq .isDraft) \
     || { echo "release $TAG not found — run ./script/release.sh $TAG first"; exit 1; }
 if [ "$IS_DRAFT" = "true" ]; then
     gh release edit "$TAG" --repo "$REPOSITORY" --draft=false --latest
 else
-    echo "already published"
+    echo "already published as latest"
 fi
 
 LATEST_TAG=$(gh api "repos/$REPOSITORY/releases/latest" --jq .tag_name)
@@ -70,13 +70,39 @@ cask "thorion" do
   homepage "https://github.com/$REPOSITORY"
 
   depends_on arch: :arm64
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "thorion.app"
 
+  # Releases are ad-hoc signed and not notarized; without this Gatekeeper blocks the first launch.
+  postflight_steps do
+    run "/usr/bin/xattr",
+        args:         ["-dr", "com.apple.quarantine", "{{appdir}}/thorion.app"],
+        must_succeed: false
+  end
+
+  uninstall launchctl: "com.thorion.app.charging-helper",
+            quit:      "com.thorion.app"
+
   zap trash: "~/Library/Preferences/com.thorion.app.plist"
+
+  caveats <<~EOS
+    Thorion is ad-hoc signed. If macOS still blocks it, run:
+      xattr -dr com.apple.quarantine #{appdir}/thorion.app
+  EOS
 end
 EOF
+
+# List Thorion in the tap README once.
+if [ -f "$WORK/tap/README.md" ] && ! grep -q '`thorion`' "$WORK/tap/README.md"; then
+    awk -v row="| \`thorion\` | Menu bar battery monitor and charge limiter for Apple Silicon MacBooks ([$REPOSITORY](https://github.com/$REPOSITORY)) |" '
+        { print }
+        /^\| `ice` \|/ && !done { print row; done = 1 }
+    ' "$WORK/tap/README.md" > "$WORK/readme.tmp"
+    printf '\n```bash\nbrew install --cask cavaldos/tap/thorion\n```\n' >> "$WORK/readme.tmp"
+    mv "$WORK/readme.tmp" "$WORK/tap/README.md"
+    git -C "$WORK/tap" add README.md
+fi
 
 git -C "$WORK/tap" add "$CASK_PATH"
 if git -C "$WORK/tap" diff --cached --quiet; then

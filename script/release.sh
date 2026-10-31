@@ -1,7 +1,7 @@
 #!/bin/bash
-# Step 1: build the DMG, tag the commit and upload a DRAFT GitHub Release.
+# Step 1: build the DMG, tag the commit and publish it as the LATEST GitHub Release.
 # Usage: ./script/release.sh vX.Y.Z   (e.g. ./script/release.sh v0.3.0)
-# Next:  test the DMG from the draft, then run ./script/notify-update.sh vX.Y.Z
+# Next:  ./script/notify-update.sh vX.Y.Z to bump the Homebrew cask.
 # Needs: gh (logged in), Xcode command line tools.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -31,13 +31,13 @@ fi
 git tag "$TAG"
 git push origin "$TAG"
 
-# A draft is invisible to /releases/latest, so installed apps are not notified yet.
+# Published as latest right away: installed apps see it on their next daily check.
 gh release create "$TAG" "$DMG_PATH" \
     --repo "$REPOSITORY" \
     --title "Thorion $TAG" \
     --generate-notes \
-    --draft
+    --latest
 
 echo ""
-echo "Draft release $TAG created: https://github.com/$REPOSITORY/releases"
-echo "Test the DMG, edit the notes if needed, then run: ./script/notify-update.sh $TAG"
+echo "Release $TAG published as latest: https://github.com/$REPOSITORY/releases/tag/$TAG"
+echo "Next, update Homebrew: ./script/notify-update.sh $TAG"

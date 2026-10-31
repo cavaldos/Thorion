@@ -1,7 +1,8 @@
 name: Release
 
-# Push a tag like v0.3.0 → builds the DMG and creates a DRAFT GitHub Release.
-# Test the DMG, then run ./script/notify-update.sh vX.Y.Z to publish + bump Homebrew.
+# Push a tag like v0.3.0 → builds the DMG and publishes it as the LATEST GitHub Release.
+# Skipped when ./script/release.sh already published it, so the DMG (and the cask SHA-256) never changes.
+# Then run ./script/notify-update.sh vX.Y.Z to bump Homebrew.
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
@@ -29,15 +30,15 @@ jobs:
       - name: Build DMG
         run: ./script/build.sh "${GITHUB_REF_NAME}"
 
-      - name: Create draft release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release upload "${GITHUB_REF_NAME}" release/Thorion.dmg --clobber
+            echo "release ${GITHUB_REF_NAME} already exists — keeping its DMG"
           else
             gh release create "${GITHUB_REF_NAME}" release/Thorion.dmg \
               --title "Thorion ${GITHUB_REF_NAME}" \
               --generate-notes \
-              --draft
+              --latest
           fi
