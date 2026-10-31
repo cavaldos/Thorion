@@ -28,7 +28,7 @@ Thorion gives you real-time insight into your MacBook's power system and lets yo
 > [!IMPORTANT]
 > **Apple Silicon only.** The way metrics and charging are controlled differs a lot between Intel and Apple Silicon, so only Apple Silicon MacBooks are supported. Requires **macOS 14.8+**.
 
-![Thorion in the menu bar](https://github.com/srimanachanta/Stasis/wiki/images/FullApp.jpg)
+![Thorion in the menu bar](./Resources/image.png)
 
 ## Install
 
