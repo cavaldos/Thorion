@@ -14,6 +14,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var settingsObservation: Task<Void, Never>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Unit tests use this app as their host process. Starting it for real would add a
+        // menu bar item and drive the charging helper, and on a Mac without a battery (a CI
+        // runner is a virtual machine) the check below would end the host before the test
+        // runner connects, which fails the whole test run with exit code 65.
+        guard !RuntimeEnvironment.isRunningTests else { return }
+
         // Exit the app immediately if the device doesn't have a battery
         let batteryIOService = IOServiceGetMatchingService(
             kIOMainPortDefault,
@@ -30,6 +36,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             setupMenu()
             requestNotificationPermissions()
             UpdateChecker.shared.startAutomaticChecks()
+            LaunchAtLoginSuggestion.suggestIfNeeded()
         }
     }
 

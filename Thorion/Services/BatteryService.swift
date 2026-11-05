@@ -51,6 +51,8 @@ class BatteryService {
     private var ioKitMonitorTask: Task<Void, Never>?
     private var smcPollTask: Task<Void, Never>?
     private var delayedPollTask: Task<Void, Never>?
+    private var pendingPoll = PendingPoll()
+    private var settlingPollTask: Task<Void, Never>?
     private var historyTask: Task<Void, Never>?
     private var backgroundPollTask: Task<Void, Never>?
     private var backgroundPollLoop: Task<Void, Never>?
@@ -58,6 +60,11 @@ class BatteryService {
     // The menu and the Settings dashboard can both be open at once, so polling
     // stops only when every requester has released it.
     private var fastPollingRequestCount = 0
+
+    // What IOKit last reported, kept apart from `metrics` because an SMC poll also writes
+    // `isCharging` there. Used to notice when IOKit announces a real change.
+    private var lastIOKitCharging: Bool?
+    private var lastIOKitAdapterConnected: Bool?
 
     private static let historySampleInterval: Duration = .seconds(60)
     /// Slower than the 1 s poll used while the menu or dashboard is open, since nothing
@@ -224,12 +231,41 @@ class BatteryService {
         }
     }
 
+    /// Reads the SMC once after `delay`. A read that is already due sooner is kept rather than
+    /// pushed back, so a run of requests cannot keep postponing it (see `PendingPoll`).
     func scheduleSinglePoll(delay: Duration = .seconds(3)) {
+        guard pendingPoll.request(at: ContinuousClock.now + delay) else { return }
+
         delayedPollTask?.cancel()
         delayedPollTask = Task {
             try? await Task.sleep(for: delay)
             guard !Task.isCancelled else { return }
+            self.pendingPoll.clear()
             await self.pollSMCOnce()
+        }
+    }
+
+    /// Reads the SMC every second for a while after something that changes charging, so the
+    /// status follows the Mac as soon as it reacts, with the menu closed too.
+    ///
+    /// After a charge limit change macOS reports the new state within milliseconds, but the
+    /// charger can take from about 2 to over 10 seconds to start charging again (seen in
+    /// powerd's log). One read a few seconds after the command usually came too early, and
+    /// the status then waited for the next IOKit notification.
+    func pollWhileSettling(for duration: Duration = .seconds(30)) {
+        settlingPollTask?.cancel()
+        settlingPollTask = Task { [weak self] in
+            let deadline = ContinuousClock.now + duration
+            var delay = Duration.milliseconds(300)
+            while !Task.isCancelled, ContinuousClock.now < deadline {
+                try? await Task.sleep(for: delay)
+                guard !Task.isCancelled, let self else { return }
+                // The fast poll already covers this while the menu or dashboard is open.
+                if self.smcPollTask == nil {
+                    await self.pollSMCOnce()
+                }
+                delay = .seconds(1)
+            }
         }
     }
 
@@ -375,7 +411,13 @@ class BatteryService {
         // SMC reports faster than IOKit can update, so refine isCharging
         // using the actual power flow direction.
         if updatedAdapter.adapterConnected {
-            updatedBattery.isCharging = batteryReading.batteryPower > 0
+            let charging = batteryReading.batteryPower > 0
+            if charging != metrics.isCharging {
+                logger.info(
+                    "SMC power flow says charging=\(charging) (battery \(batteryReading.batteryPower, format: .fixed(precision: 2)) W)"
+                )
+            }
+            updatedBattery.isCharging = charging
         }
 
         if updatedBattery != metrics {
@@ -395,6 +437,19 @@ class BatteryService {
     /// battery notification, so it is written only by the SMC poll.
     private func handleIOKitUpdate(_ newBatteryMetrics: BatteryMetrics, adapterUpdate: AdapterMetrics) {
         logger.debug("Received IOKit update")
+
+        if newBatteryMetrics.isCharging != lastIOKitCharging
+            || adapterUpdate.adapterConnected != lastIOKitAdapterConnected
+        {
+            logger.info(
+                "IOKit reports charging=\(newBatteryMetrics.isCharging), adapter connected=\(adapterUpdate.adapterConnected)"
+            )
+            lastIOKitCharging = newBatteryMetrics.isCharging
+            lastIOKitAdapterConnected = adapterUpdate.adapterConnected
+            // The adapter and battery power that the status is derived from only come from
+            // SMC polls, so they predate this change. Read them again straight away.
+            scheduleSinglePoll(delay: .milliseconds(200))
+        }
 
         var updatedBattery = newBatteryMetrics
         updatedBattery.batteryVoltage = metrics.batteryVoltage
@@ -480,6 +535,9 @@ class BatteryService {
         fastPollingRequestCount = 0
         delayedPollTask?.cancel()
         delayedPollTask = nil
+        pendingPoll.clear()
+        settlingPollTask?.cancel()
+        settlingPollTask = nil
         historyTask?.cancel()
         historyTask = nil
         backgroundPollTask?.cancel()

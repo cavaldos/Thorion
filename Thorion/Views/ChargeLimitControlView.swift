@@ -9,6 +9,7 @@ struct ChargeLimitControlView: View {
     @Default(.chargeLimit) private var chargeLimit
     @Default(.sailingMode) private var sailingMode
     @Default(.sailingModeLimit) private var sailingModeLimit
+    @Default(.automaticDischarge) private var automaticDischarge
     @Environment(\.colorScheme) private var colorScheme
     // Committed only on release, so a drag doesn't ask the helper to switch limits at every step.
     @State private var draggedLimit: Int?
@@ -51,6 +52,24 @@ struct ChargeLimitControlView: View {
         return draggedLimit ?? chargeLimit
     }
 
+    // A limit below what macOS can hold is held by cutting the adapter when Automatic
+    // discharge is on and the helper that cuts it is working.
+    private var holdsByCuttingAdapter: Bool {
+        viewModel.usesNativeChargeLimit
+            && ChargeLimitScale.holdsByCuttingAdapter(
+                automaticDischarge: automaticDischarge, canCutAdapter: viewModel.canCutAdapter)
+    }
+
+    // The limit really held. One chosen below what this Mac can hold (70% when macOS only
+    // pauses charging from 80%) is held at that level unless the adapter is cut to hold it.
+    // The sailing marker follows it.
+    private var heldLimit: Int {
+        ChargeLimitScale.effectiveLimit(
+            displayedLimit,
+            usingNativeChargeLimit: viewModel.usesNativeChargeLimit,
+            holdsByCuttingAdapter: holdsByCuttingAdapter)
+    }
+
     private var isSliderEnabled: Bool {
         manageCharging && !viewModel.chargeLimitOverrideActive
     }
@@ -88,10 +107,40 @@ struct ChargeLimitControlView: View {
                     action: { Task { await ChargingHelperManager.shared.repair() } }
                 )
             }
+
+            limitNote
         }
         .font(.system(size: 13))
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
+    }
+
+    // The slider lets the limit go below what macOS can hold, so say what really happens.
+    @ViewBuilder
+    private var limitNote: some View {
+        if manageCharging {
+            if heldLimit != displayedLimit {
+                note(
+                    automaticDischarge
+                        ? "macOS cannot hold the battery below 80%, so it keeps charging up to 80%."
+                        : "macOS cannot hold the battery below 80%, so it keeps charging up to 80%. Turn on Automatic discharge to hold it lower."
+                )
+            } else if ChargeLimitScale.isHeldByCuttingAdapter(
+                displayedLimit,
+                usingNativeChargeLimit: viewModel.usesNativeChargeLimit,
+                holdsByCuttingAdapter: holdsByCuttingAdapter)
+            {
+                note("Below 80%, Thorion holds the battery by running the Mac on battery between charges.")
+            }
+        }
+    }
+
+    private func note(_ message: LocalizedStringKey) -> some View {
+        Text(message)
+            .font(.system(size: 12))
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Actions
@@ -320,7 +369,7 @@ struct ChargeLimitControlView: View {
     /// charges to full regardless.
     private var sailingThreshold: Int? {
         guard manageCharging, sailingMode, !viewModel.chargeLimitOverrideActive else { return nil }
-        return displayedLimit - sailingModeLimit
+        return heldLimit - sailingModeLimit
     }
 
     private func sailingMarker(threshold: Int) -> some View {

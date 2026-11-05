@@ -3,10 +3,16 @@ import Defaults
 import Foundation
 import Observation
 import SwiftUI
+import os.log
 
 @MainActor
 @Observable
 class MenuViewModel {
+    private let logger = Logger(
+        subsystem: "com.thorion.app",
+        category: "MenuViewModel"
+    )
+
     /// Shown when the helper reports a value the Mac does not expose. Rendering
     /// an unsupported reading as "0" would read as a real measurement.
     private static let unavailableValueText = "N/A"
@@ -43,6 +49,10 @@ class MenuViewModel {
     var canTopUp: Bool { chargeManager.canTopUp }
     var canForceDischarge: Bool { chargeManager.canForceDischarge }
     var isSailing: Bool { chargeManager.isSailing }
+    /// Whether charging can only be paused from 80% (see `ChargeLimitScale`).
+    var usesNativeChargeLimit: Bool { chargeManager.usesNativeChargeLimit }
+    /// Whether the adapter can be cut right now, which is how a limit below 80% is held.
+    var canCutAdapter: Bool { chargeManager.canCutAdapter }
     var adapterConnected: Bool = false
 
     let energyAppsMonitor = EnergyAppsMonitor()
@@ -165,6 +175,7 @@ class MenuViewModel {
 
         updateUptimeText()
 
+        let previousChargingMode = chargingMode
         if derivedPowerSource == .acAdapter {
             if metrics.isCharging {
                 chargingMode = .charging
@@ -176,6 +187,11 @@ class MenuViewModel {
         } else {
             chargingMode = .discharging
             batteryModeText = "Discharging"
+        }
+        if chargingMode != previousChargingMode {
+            logger.info(
+                "Status changed: \(String(describing: previousChargingMode), privacy: .public) -> \(String(describing: self.chargingMode), privacy: .public) (power source \(String(describing: derivedPowerSource), privacy: .public), isCharging \(metrics.isCharging))"
+            )
         }
 
         batteryTemperatureText =

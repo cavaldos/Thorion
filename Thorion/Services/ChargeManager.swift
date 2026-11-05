@@ -16,10 +16,18 @@ class ChargeManager {
 
     private var lastAdapterConnected: Bool?
     private var lastManageChargingEnabled: Bool?
-    private var hasReachedChargeLimit = false
+    private var policy = ChargePolicy()
+
+    /// What Thorion last asked the Mac for. When it changes the Mac needs a few seconds to
+    /// follow, and the status has to catch up with it.
+    private struct Enforcement: Equatable {
+        var charging: Bool
+        var adapterEnabled: Bool
+        var chargeLimit: Int
+    }
+    private var lastEnforcement: Enforcement?
     private var lastNotifiedChargingState: Bool?
     private var ledIsManaged = false
-    private var lastEffectiveChargeLimit: Int?
     private var adapterDisconnectReportedAt: ContinuousClock.Instant?
     private var adapterDisconnectRecheck: Task<Void, Never>?
 
@@ -113,15 +121,43 @@ class ChargeManager {
         return true
     }
 
+    /// Whether charging can only be paused through the macOS charge limit, which cannot hold
+    /// the battery below 80%.
+    var usesNativeChargeLimit: Bool {
+        batteryService.chargeInhibitMethod == .nativeChargeLimit
+    }
+
+    /// Whether the adapter can be cut right now: the Mac supports it and the helper that does
+    /// it is working. Without that a command to cut it would silently do nothing.
+    var canCutAdapter: Bool {
+        batteryService.deviceCapabilities.adapterControl && ChargingHelperManager.shared.isWorking
+    }
+
+    /// Whether a limit below what macOS can hold is held by cutting the adapter, so the Mac
+    /// runs on its battery between charges. Only with Automatic discharge on.
+    var holdsByCuttingAdapter: Bool {
+        usesNativeChargeLimit
+            && ChargeLimitScale.holdsByCuttingAdapter(
+                automaticDischarge: Defaults[.automaticDischarge], canCutAdapter: canCutAdapter)
+    }
+
+    /// The saved limit, raised to the lowest level this Mac can really hold unless the battery
+    /// is held by cutting the adapter. This is the limit that decisions and the Discharge
+    /// button go by.
+    var effectiveChargeLimit: Int {
+        ChargeLimitScale.effectiveLimit(
+            Defaults[.chargeLimit],
+            usingNativeChargeLimit: usesNativeChargeLimit,
+            holdsByCuttingAdapter: holdsByCuttingAdapter)
+    }
+
     private func evaluate(controlState: BatteryControlState) {
-        var stateWasCleared = false
         let adapterConnected = resolveAdapterConnection(reported: controlState.adapterConnected)
 
         if adapterConnected != lastAdapterConnected {
             logger.info("Adapter connection changed: \(adapterConnected)")
             lastAdapterConnected = adapterConnected
             clearCachedState()
-            stateWasCleared = true
         }
 
         guard Defaults[.manageCharging], adapterConnected else {
@@ -141,7 +177,6 @@ class ChargeManager {
         if lastManageChargingEnabled != true {
             lastManageChargingEnabled = true
             clearCachedState()
-            stateWasCleared = true
         }
 
         let batteryPercentage =
@@ -158,83 +193,41 @@ class ChargeManager {
 
         // Discharge drains the battery back down to the limit, then hands power back to
         // the adapter.
-        if forceDischargeActive, batteryPercentage <= Defaults[.chargeLimit] {
+        if forceDischargeActive, batteryPercentage <= effectiveChargeLimit {
             logger.info("Discharge finished: battery is back at the charge limit")
             forceDischargeActive = false
         }
 
-        let chargeLimit = chargeLimitOverrideActive ? 100 : Defaults[.chargeLimit]
+        let decision = policy.decide(
+            percentage: batteryPercentage,
+            temperature: controlState.batteryTemperature,
+            settings: ChargePolicy.Settings(
+                chargeLimit: chargeLimitOverrideActive ? 100 : Defaults[.chargeLimit],
+                sailingMode: Defaults[.sailingMode],
+                sailingModeLimit: Defaults[.sailingModeLimit],
+                automaticDischarge: Defaults[.automaticDischarge],
+                heatProtection: Defaults[.enableHeatProtectionMode],
+                heatProtectionLimit: Defaults[.heatProtectionLimit],
+                forceDischarge: forceDischargeActive,
+                lowestHoldablePercentage: ChargeLimitScale.lowestHoldablePercentage(
+                    usingNativeChargeLimit: usesNativeChargeLimit),
+                canCutAdapter: canCutAdapter
+            )
+        )
+        isSailing = decision.isSailing
 
-        if stateWasCleared && Defaults[.sailingMode]
-            && batteryPercentage >= chargeLimit - Defaults[.sailingModeLimit] {
-            hasReachedChargeLimit = true
+        let enforcement = Enforcement(
+            charging: decision.charging,
+            adapterEnabled: decision.adapterEnabled,
+            chargeLimit: decision.chargeLimit
+        )
+        if enforcement != lastEnforcement {
+            lastEnforcement = enforcement
+            logger.info(
+                "Charging decision: charging=\(decision.charging), adapter=\(decision.adapterEnabled), limit=\(decision.chargeLimit)% (\(decision.reason, privacy: .public))"
+            )
+            batteryService.pollWhileSettling()
         }
-
-        // Raising the limit means "charge up to the new limit", even when the battery
-        // already sits within the sailing range below it.
-        if let lastEffectiveChargeLimit, chargeLimit > lastEffectiveChargeLimit {
-            hasReachedChargeLimit = false
-        }
-        lastEffectiveChargeLimit = chargeLimit
-
-        var desiredCharging: Bool
-        var desiredAdapter: Bool
-        var chargingStateReason: String
-
-        if batteryPercentage > chargeLimit {
-            hasReachedChargeLimit = true
-            desiredCharging = false
-            desiredAdapter = Defaults[.automaticDischarge] ? false : true
-            chargingStateReason = "Battery is above the charge limit of \(chargeLimit)%"
-        } else if batteryPercentage == chargeLimit {
-            hasReachedChargeLimit = true
-            desiredCharging = false
-            desiredAdapter = true
-            chargingStateReason = "Battery has reached the charge limit of \(chargeLimit)%"
-        } else if Defaults[.sailingMode] {
-            let sailingThreshold = chargeLimit - Defaults[.sailingModeLimit]
-            let inSailingRange = batteryPercentage >= sailingThreshold
-
-            if inSailingRange && hasReachedChargeLimit {
-                desiredCharging = false
-                desiredAdapter = true
-                chargingStateReason = "Sailing mode is maintaining charge below \(chargeLimit)%"
-            } else {
-                let droppedOutOfSailingRange = !inSailingRange && hasReachedChargeLimit
-                hasReachedChargeLimit = false
-                desiredCharging = true
-                desiredAdapter = true
-                if inSailingRange {
-                    chargingStateReason = "Charging to reach charge limit of \(chargeLimit)%"
-                } else if droppedOutOfSailingRange {
-                    chargingStateReason =
-                        "Battery dropped below sailing threshold of \(sailingThreshold)%"
-                } else {
-                    chargingStateReason = "Battery is below the charge limit of \(chargeLimit)%"
-                }
-            }
-        } else {
-            desiredCharging = true
-            desiredAdapter = true
-            chargingStateReason = "Battery is below the charge limit of \(chargeLimit)%"
-        }
-
-        let heatProtectionActive = Defaults[.enableHeatProtectionMode]
-            && controlState.batteryTemperature > Double(Defaults[.heatProtectionLimit])
-        if heatProtectionActive {
-            desiredCharging = false
-            chargingStateReason =
-                "Battery temperature exceeds \(Defaults[.heatProtectionLimit])°C"
-        }
-
-        if forceDischargeActive {
-            desiredCharging = false
-            desiredAdapter = false
-        }
-
-        isSailing = Defaults[.sailingMode] && hasReachedChargeLimit && !forceDischargeActive
-            && batteryPercentage <= chargeLimit
-            && batteryPercentage >= chargeLimit - Defaults[.sailingModeLimit]
 
         let capabilities = batteryService.deviceCapabilities
 
@@ -243,37 +236,40 @@ class ChargeManager {
             // is always expressed in that scale. While charging it is set to the charge
             // limit so macOS stops by itself even while the Mac sleeps; with hardware
             // percentages the two scales differ, so Thorion pauses charging itself.
+            let lowestNativeLimit = NativeChargeLimitService.supportedRange.lowerBound
             let nativeLimit: Int
-            if desiredCharging {
-                nativeLimit = Defaults[.useHardwarePercentage]
-                    ? NativeChargeLimitService.supportedRange.upperBound : chargeLimit
+            if decision.charging {
+                if usesNativeChargeLimit, decision.chargeLimit < lowestNativeLimit {
+                    // The battery is held by cutting the adapter at the limit. Should that
+                    // ever fail, macOS still stops charging at the lowest limit it accepts.
+                    nativeLimit = lowestNativeLimit
+                } else {
+                    nativeLimit = Defaults[.useHardwarePercentage]
+                        ? NativeChargeLimitService.supportedRange.upperBound : decision.chargeLimit
+                }
             } else {
                 nativeLimit = controlState.batteryPercentage
             }
-            setCharging(enabled: desiredCharging, nativeLimit: nativeLimit)
+            setCharging(enabled: decision.charging, nativeLimit: nativeLimit)
             sendChargingStateNotification(
-                charging: desiredCharging, reason: chargingStateReason
+                charging: decision.charging, reason: decision.reason
             )
         }
         if capabilities.adapterControl {
-            setAdapter(enabled: desiredAdapter)
+            setAdapter(enabled: decision.adapterEnabled)
         }
         if capabilities.hasMagSafe, capabilities.magsafeLEDControl {
-            updateLED(
-                charging: desiredCharging,
-                adapterEnabled: desiredAdapter,
-                heatProtectionActive: heatProtectionActive
-            )
+            updateLED(decision.indicator)
         }
 
         let shouldPreventSleep = Defaults[.disableSleepUntilChargeLimit]
-            && desiredCharging
+            && decision.charging
         updateSleepAssertion(shouldPreventSleep: shouldPreventSleep)
     }
 
     /// Green while charging is paused, orange while charging, and blinking orange while
     /// the Mac runs off the battery with the adapter connected.
-    private func updateLED(charging: Bool, adapterEnabled: Bool, heatProtectionActive: Bool) {
+    private func updateLED(_ indicator: ChargePolicy.Indicator) {
         guard Defaults[.manageMagSafeLED] else {
             // Hand the LED back to macOS once, rather than leaving the last color stuck.
             if ledIsManaged {
@@ -284,14 +280,11 @@ class ChargeManager {
         }
 
         let state: MagSafeLEDState
-        if !adapterEnabled {
-            state = .blinkOrangeSlow
-        } else if heatProtectionActive {
-            state = Defaults[.heatProtectionMagSafeLEDState]
-        } else if charging {
-            state = .orange
-        } else {
-            state = .green
+        switch indicator {
+        case .runningOnBattery: state = .blinkOrangeSlow
+        case .heatProtection: state = Defaults[.heatProtectionMagSafeLEDState]
+        case .charging: state = .orange
+        case .paused: state = .green
         }
 
         ledIsManaged = true
@@ -300,11 +293,13 @@ class ChargeManager {
 
     private func clearCachedState() {
         lastNotifiedChargingState = nil
-        hasReachedChargeLimit = false
+        lastEnforcement = nil
+        policy.reset()
     }
 
     private func resetToDefaults(restoreNativeChargeLimit shouldRestoreNativeChargeLimit: Bool) {
-        hasReachedChargeLimit = false
+        policy.reset()
+        lastEnforcement = nil
         isSailing = false
         lastManageChargingEnabled = false
         updateSleepAssertion(shouldPreventSleep: false)
@@ -340,7 +335,7 @@ class ChargeManager {
                 try await batteryService.manageBatteryCharging(enabled: enabled, nativeLimit: nativeLimit)
                 batteryService.scheduleSinglePoll()
             } catch {
-                logger.error("Failed to set charging to \(enabled): \(error)")
+                logger.error("Failed to set charging to \(enabled): \(error, privacy: .public)")
             }
         }
     }
@@ -352,18 +347,18 @@ class ChargeManager {
                 try await batteryService.manageExternalPower(enabled: enabled)
                 batteryService.scheduleSinglePoll()
             } catch {
-                logger.error("Failed to set adapter to \(enabled): \(error)")
+                logger.error("Failed to set adapter to \(enabled): \(error, privacy: .public)")
             }
         }
     }
 
     private func setLED(state: MagSafeLEDState) {
-        logger.info("Setting MagSafe LED: \(String(describing: state))")
+        logger.info("Setting MagSafe LED: \(String(describing: state), privacy: .public)")
         Task {
             do {
                 try await batteryService.manageMagsafeLED(target: state)
             } catch {
-                logger.error("Failed to set LED to \(String(describing: state)): \(error)")
+                logger.error("Failed to set LED to \(String(describing: state), privacy: .public): \(error, privacy: .public)")
             }
         }
     }
@@ -431,7 +426,7 @@ class ChargeManager {
 
     /// Discharge only has something to do while the battery is above the limit.
     var canForceDischarge: Bool {
-        forceDischargeActive || currentBatteryPercentage > Defaults[.chargeLimit]
+        forceDischargeActive || currentBatteryPercentage > effectiveChargeLimit
     }
 
     func toggleChargeLimitOverride() {

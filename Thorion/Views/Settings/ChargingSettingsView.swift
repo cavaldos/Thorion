@@ -38,8 +38,27 @@ struct ChargeControlSettingsView: View {
         hasChargingControl || hasAdapterControl
     }
 
+    // A limit below what macOS can hold is held by cutting the adapter when Automatic
+    // discharge is on and the helper that cuts it is working.
+    private var holdsByCuttingAdapter: Bool {
+        usesNativeChargeLimit
+            && ChargeLimitScale.holdsByCuttingAdapter(
+                automaticDischarge: automaticDischarge,
+                canCutAdapter: hasAdapterControl && helperManager.isWorking)
+    }
+
+    // The limit really held. One chosen below what this Mac can hold (70% when macOS only
+    // pauses charging from 80%) is held at that level unless the adapter is cut to hold it,
+    // so charging resumes relative to it.
+    private var heldLimit: Int {
+        ChargeLimitScale.effectiveLimit(
+            chargeLimit,
+            usingNativeChargeLimit: usesNativeChargeLimit,
+            holdsByCuttingAdapter: holdsByCuttingAdapter)
+    }
+
     private var sailingResumePercentage: Int {
-        chargeLimit - sailingModeLimit
+        heldLimit - sailingModeLimit
     }
 
     var body: some View {
@@ -105,12 +124,20 @@ struct ChargeControlSettingsView: View {
             } footer: {
                 if !hasAnyControl {
                     Text("Charge management is not supported on this device.")
-                } else if manageCharging && usesNativeChargeLimit
-                    && chargeLimit < NativeChargeLimitService.supportedRange.lowerBound
+                } else if manageCharging
+                    && ChargeLimitScale.isRaised(
+                        chargeLimit, usingNativeChargeLimit: usesNativeChargeLimit,
+                        holdsByCuttingAdapter: holdsByCuttingAdapter)
                 {
                     Text(
                         "On this version of macOS, charging is paused through the macOS charge limit, which cannot hold the battery below 80%."
                     )
+                } else if manageCharging
+                    && ChargeLimitScale.isHeldByCuttingAdapter(
+                        chargeLimit, usingNativeChargeLimit: usesNativeChargeLimit,
+                        holdsByCuttingAdapter: holdsByCuttingAdapter)
+                {
+                    Text("Below 80%, Thorion holds the battery by running the Mac on battery between charges.")
                 }
             }
 
@@ -127,6 +154,8 @@ struct ChargeControlSettingsView: View {
                 } footer: {
                     if !hasAdapterControl {
                         Text("Adapter control is not supported on this device.")
+                    } else if usesNativeChargeLimit {
+                        Text("On this Mac, Automatic discharge also holds limits below 80%, which macOS cannot hold.")
                     }
                 }
 

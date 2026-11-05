@@ -65,7 +65,7 @@ brew uninstall --cask cavaldos/tap/thorion
 
 ## Highlights
 
-- **Charge Limit** — Set a max charge level (50–100%) enforced at the hardware level, even through sleep.
+- **Charge Limit** — Set a max charge level (50–100%) and hold it, even through sleep. On macOS 27 the limit is enforced by macOS itself, which cannot hold the battery below 80%; with Automatic Discharge on, Thorion holds lower limits by running the Mac on its battery between charges.
 - **Sailing Mode** — Avoid micro-charging by letting the battery float within a configurable range.
 - **Automatic Discharge** — Drain to your target level while staying plugged in.
 - **Heat Protection** — Pause charging when battery temperature gets too high.

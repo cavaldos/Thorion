@@ -73,6 +73,13 @@ class ChargingHelperManager {
         service.status == .enabled
     }
 
+    /// Whether commands to the helper can be expected to arrive: it is allowed to run and has
+    /// not stopped answering. Anything that must not rely on a command being carried out, such
+    /// as holding the battery by cutting the adapter, checks this first.
+    var isWorking: Bool {
+        helperStatus == .installed && isResponding
+    }
+
     private init() {
         service = SMAppService.daemon(plistName: Self.plistName)
         switch service.status {
@@ -155,7 +162,7 @@ class ChargingHelperManager {
             }
             throw error
         } catch {
-            logger.error("Charging helper unreachable: \(error.localizedDescription)")
+            logger.error("Charging helper unreachable: \(error.localizedDescription, privacy: .public)")
             setResponding(false)
             repairAutomaticallyIfNeeded()
             throw error
@@ -181,12 +188,12 @@ class ChargingHelperManager {
         do {
             try await service.unregister()
         } catch {
-            logger.error("Failed to unregister charging helper: \(error.localizedDescription)")
+            logger.error("Failed to unregister charging helper: \(error.localizedDescription, privacy: .public)")
         }
         do {
             try install()
         } catch {
-            logger.error("Failed to register charging helper: \(error.localizedDescription)")
+            logger.error("Failed to register charging helper: \(error.localizedDescription, privacy: .public)")
         }
         // Assume it works until the next command says otherwise, so the commands that
         // follow are sent instead of being skipped.

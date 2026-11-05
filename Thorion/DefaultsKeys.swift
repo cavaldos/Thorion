@@ -30,6 +30,49 @@ enum ChargeLimitScale {
     static let range = 50...100
     static let step = 5
 
+    /// The lowest battery level at which this Mac can hold charging paused. The SMC can pause
+    /// anywhere. macOS 27 removed those keys, which leaves the charge limit macOS enforces
+    /// itself, and powerd refuses a limit under 80%: asking for less just lets the battery
+    /// keep charging up to 80%.
+    static func lowestHoldablePercentage(usingNativeChargeLimit: Bool) -> Int {
+        usingNativeChargeLimit ? NativeChargeLimitService.supportedRange.lowerBound : 0
+    }
+
+    /// Whether a limit below `lowestHoldablePercentage` can still be held, by cutting the adapter
+    /// so the Mac runs on its battery between charges. That drains the battery while plugged in,
+    /// so it needs the user's opt-in (Automatic discharge) and a helper that is able to do it.
+    static func holdsByCuttingAdapter(automaticDischarge: Bool, canCutAdapter: Bool) -> Bool {
+        automaticDischarge && canCutAdapter
+    }
+
+    /// The limit that is really held. A limit chosen below what the Mac can hold, such as 70%
+    /// on a Mac that can only pause charging from 80%, is held at that level instead, unless
+    /// the battery is held by cutting the adapter.
+    static func effectiveLimit(
+        _ limit: Int, usingNativeChargeLimit: Bool, holdsByCuttingAdapter: Bool = false
+    ) -> Int {
+        if holdsByCuttingAdapter { return limit }
+        return max(limit, lowestHoldablePercentage(usingNativeChargeLimit: usingNativeChargeLimit))
+    }
+
+    /// Whether the limit chosen is below what the Mac can hold, so a higher one is held.
+    static func isRaised(
+        _ limit: Int, usingNativeChargeLimit: Bool, holdsByCuttingAdapter: Bool = false
+    ) -> Bool {
+        effectiveLimit(
+            limit, usingNativeChargeLimit: usingNativeChargeLimit,
+            holdsByCuttingAdapter: holdsByCuttingAdapter) != limit
+    }
+
+    /// Whether the limit chosen is below what macOS can hold but the battery is held anyway
+    /// by cutting the adapter.
+    static func isHeldByCuttingAdapter(
+        _ limit: Int, usingNativeChargeLimit: Bool, holdsByCuttingAdapter: Bool
+    ) -> Bool {
+        holdsByCuttingAdapter
+            && limit < lowestHoldablePercentage(usingNativeChargeLimit: usingNativeChargeLimit)
+    }
+
     static func snapped(_ percentage: Double) -> Int {
         let stepped = Int((percentage / Double(step)).rounded()) * step
         return min(max(stepped, range.lowerBound), range.upperBound)
@@ -39,6 +82,8 @@ enum ChargeLimitScale {
 extension Defaults.Keys {
     // General
     static let launchAtLogin = Key<Bool>("launchAtLogin", default: false)
+    /// Set by "Don't ask again" on the suggestion to add Thorion to Login Items.
+    static let skipLaunchAtLoginSuggestion = Key<Bool>("skipLaunchAtLoginSuggestion", default: false)
 
     // Updates
     static let automaticallyCheckForUpdates = Key<Bool>("automaticallyCheckForUpdates", default: true)

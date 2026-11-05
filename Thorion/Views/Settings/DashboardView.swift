@@ -1,6 +1,7 @@
 import Charts
 import Defaults
 import SwiftUI
+import smc_power
 
 struct DashboardView: View {
     let batteryService: BatteryService
@@ -444,6 +445,21 @@ private struct BatteryLevelChart: View {
     @Default(.useHardwarePercentage) private var useHardwarePercentage
     @Default(.manageCharging) private var manageCharging
     @Default(.chargeLimit) private var chargeLimit
+    @Default(.automaticDischarge) private var automaticDischarge
+
+    /// The limit the battery is really held to, which is higher than the one chosen on a Mac
+    /// whose charge limit cannot go below 80% unless the adapter is cut to hold it lower.
+    private var heldLimit: Int {
+        let usesNativeChargeLimit = batteryService.chargeInhibitMethod == .nativeChargeLimit
+        return ChargeLimitScale.effectiveLimit(
+            chargeLimit,
+            usingNativeChargeLimit: usesNativeChargeLimit,
+            holdsByCuttingAdapter: usesNativeChargeLimit
+                && ChargeLimitScale.holdsByCuttingAdapter(
+                    automaticDischarge: automaticDischarge,
+                    canCutAdapter: batteryService.deviceCapabilities.adapterControl
+                        && ChargingHelperManager.shared.isWorking))
+    }
 
     var body: some View {
         let samples = batteryService.history
@@ -479,7 +495,7 @@ private struct BatteryLevelChart: View {
                 }
 
                 if manageCharging {
-                    RuleMark(y: .value("Charge limit", chargeLimit))
+                    RuleMark(y: .value("Charge limit", heldLimit))
                         .foregroundStyle(Color.orange)
                         .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
                 }

@@ -207,6 +207,16 @@
         }
       }
     },
+    "Add to Login Items" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thêm vào Mục đăng nhập"
+          }
+        }
+      }
+    },
     "Advanced" : {
       "localizations" : {
         "de" : {
@@ -627,6 +637,16 @@
         }
       }
     },
+    "Below 80%, Thorion holds the battery by running the Mac on battery between charges." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dưới 80%, Thorion giữ pin bằng cách cho Mac chạy bằng pin giữa các lần sạc."
+          }
+        }
+      }
+    },
     "Charge management is off" : {
       "localizations" : {
         "de" : {
@@ -803,6 +823,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Màn hình"
+          }
+        }
+      }
+    },
+    "Don't ask again" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không hỏi lại"
           }
         }
       }
@@ -2063,6 +2093,26 @@
     "macOS 27" : {
       "shouldTranslate" : false
     },
+    "macOS cannot hold the battery below 80%, so it keeps charging up to 80%." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS không giữ được pin dưới 80% nên vẫn sạc tới 80%."
+          }
+        }
+      }
+    },
+    "macOS cannot hold the battery below 80%, so it keeps charging up to 80%. Turn on Automatic discharge to hold it lower." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "macOS không giữ được pin dưới 80% nên vẫn sạc tới 80%. Bật Tự động xả pin để giữ thấp hơn."
+          }
+        }
+      }
+    },
     "MagSafe LED Control" : {
       "localizations" : {
         "de" : {
@@ -2303,6 +2353,16 @@
         }
       }
     },
+    "Not Now" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Để sau"
+          }
+        }
+      }
+    },
     "Notifications" : {
       "localizations" : {
         "de" : {
@@ -2423,6 +2483,16 @@
         }
       }
     },
+    "On this Mac, Automatic discharge also holds limits below 80%, which macOS cannot hold." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trên máy này, Tự động xả pin còn giữ được các giới hạn dưới 80% mà macOS không giữ được."
+          }
+        }
+      }
+    },
     "On this version of macOS, charging is paused through the macOS charge limit, which cannot hold the battery below 80%." : {
       "localizations" : {
         "vi" : {
@@ -2509,6 +2579,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从“应用程序”文件夹再次打开 Thorion 以显示设置。"
+          }
+        }
+      }
+    },
+    "Open Thorion at login?" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở Thorion khi đăng nhập?"
           }
         }
       }
@@ -3109,6 +3189,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "启动"
+          }
+        }
+      }
+    },
+    "Thorion could not be added to Login Items" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể thêm Thorion vào Mục đăng nhập"
+          }
+        }
+      }
+    },
+    "Thorion lives in the menu bar and keeps your charge limit applied. Add it to Login Items so it starts whenever you log in. You can change this later in Settings → General." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thorion nằm trên thanh menu và luôn áp dụng giới hạn sạc của bạn. Hãy thêm Thorion vào Mục đăng nhập để ứng dụng tự khởi động mỗi khi bạn đăng nhập. Bạn có thể thay đổi sau trong Cài đặt → Chung."
           }
         }
       }
@@ -4008,6 +4108,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关闭“在后台更新”后，电力分配图仅在菜单或仪表盘打开时刷新，以节省电量。"
+          }
+        }
+      }
+    },
+    "You can add it yourself in System Settings → General → Login Items." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bạn có thể tự thêm trong Cài đặt hệ thống → Chung → Mục đăng nhập."
           }
         }
       }

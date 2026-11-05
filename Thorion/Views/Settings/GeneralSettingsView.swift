@@ -1,4 +1,5 @@
 import Defaults
+import ServiceManagement
 import SwiftUI
 
 struct GeneralSettingsView: View {
@@ -9,7 +10,13 @@ struct GeneralSettingsView: View {
     var body: some View {
         Form {
             Section("Startup") {
-                Toggle("Launch at login", isOn: $launchAtLogin)
+                Toggle(
+                    "Launch at login",
+                    isOn: Binding(
+                        get: { launchAtLogin },
+                        set: { setLaunchAtLogin($0) }
+                    )
+                )
             }
 
             Section {
@@ -28,8 +35,16 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0)
-        .onChange(of: launchAtLogin) { _, newValue in
-            LaunchAtLoginService.shared.setLaunchAtLogin(newValue)
+        // The item can be added or removed in System Settings, so show what macOS says.
+        .onAppear { launchAtLogin = LaunchAtLoginService.shared.isEnabled }
+    }
+
+    private func setLaunchAtLogin(_ enabled: Bool) {
+        let status = LaunchAtLoginService.shared.setLaunchAtLogin(enabled)
+        // Show what macOS did rather than what was asked for: it may wait for the user's approval.
+        launchAtLogin = status == .enabled
+        if enabled, status == .requiresApproval {
+            LaunchAtLoginService.shared.openLoginItemsSettings()
         }
     }
 }
