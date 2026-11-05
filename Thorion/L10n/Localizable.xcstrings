@@ -297,16 +297,6 @@
         }
       }
     },
-    "Allow…" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cho phép…"
-          }
-        }
-      }
-    },
     "Automatic discharge" : {
       "localizations" : {
         "de" : {
@@ -683,56 +673,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "充电管理已关闭"
-          }
-        }
-      }
-    },
-    "Charging helper is not allowed" : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trình trợ giúp sạc chưa được cho phép"
-          }
-        }
-      }
-    },
-    "Charging helper is not responding" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ladehelfer reagiert nicht"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El asistente de carga no responde"
-          }
-        },
-        "es-US" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "El asistente de carga no responde"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充電ヘルパーが応答しません"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Trình trợ giúp sạc không phản hồi"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "充电助手无响应"
           }
         }
       }
@@ -2093,26 +2033,6 @@
     "macOS 27" : {
       "shouldTranslate" : false
     },
-    "macOS cannot hold the battery below 80%, so it keeps charging up to 80%." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS không giữ được pin dưới 80% nên vẫn sạc tới 80%."
-          }
-        }
-      }
-    },
-    "macOS cannot hold the battery below 80%, so it keeps charging up to 80%. Turn on Automatic discharge to hold it lower." : {
-      "localizations" : {
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "macOS không giữ được pin dưới 80% nên vẫn sạc tới 80%. Bật Tự động xả pin để giữ thấp hơn."
-          }
-        }
-      }
-    },
     "MagSafe LED Control" : {
       "localizations" : {
         "de" : {
@@ -2839,46 +2759,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "电源"
-          }
-        }
-      }
-    },
-    "Repair" : {
-      "localizations" : {
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reparieren"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reparar"
-          }
-        },
-        "es-US" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reparar"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "修復"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sửa"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "修复"
           }
         }
       }

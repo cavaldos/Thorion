@@ -41,6 +41,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func setupServices() async {
+        // Turning charge management on registered the helper, but macOS can lose that
+        // registration, and then the LED and adapter commands only time out.
+        if Defaults[.manageCharging] {
+            ChargingHelperManager.shared.registerIfMissing()
+        }
         batteryService = BatteryService()
         await batteryService.loadCapabilities()
         chargeManager = ChargeManager(batteryService: batteryService)

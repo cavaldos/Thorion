@@ -1,4 +1,5 @@
 import Foundation
+import smc_power
 
 /// Works out what charging should do for one battery reading: whether to charge, whether
 /// the Mac should run on the adapter, and what the MagSafe LED should say.
@@ -26,13 +27,14 @@ struct ChargePolicy {
         var canCutAdapter = false
     }
 
-    /// What the MagSafe LED should say. `ChargeManager` turns it into an LED color.
+    /// What the MagSafe LED should say. `ledState(heatProtection:)` turns it into a color.
     enum Indicator: Equatable {
         /// Orange.
         case charging
         /// Green: the battery is being left alone, on the adapter or held on its battery.
         case paused
-        /// Slow blinking orange: the adapter is connected but the Mac is draining the battery.
+        /// Green too: the adapter is connected but the Mac drains the battery down to the limit,
+        /// which it is above.
         case runningOnBattery
         /// The color the user picked for heat protection.
         case heatProtection
@@ -172,5 +174,19 @@ struct ChargePolicy {
             isSailing: isSailing,
             chargeLimit: limit
         )
+    }
+}
+
+extension ChargePolicy.Indicator {
+    /// The MagSafe LED color: orange only while the battery charges, green once it is at or
+    /// above the limit, a full battery included. Draining a battery that is above the limit
+    /// is green as well, because the limit has been reached. Heat protection shows the color
+    /// the user picked.
+    func ledState(heatProtection: MagSafeLEDState) -> MagSafeLEDState {
+        switch self {
+        case .charging: .orange
+        case .paused, .runningOnBattery: .green
+        case .heatProtection: heatProtection
+        }
     }
 }

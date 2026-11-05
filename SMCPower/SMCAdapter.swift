@@ -52,13 +52,19 @@ public struct SMCAdapter: Sendable {
     }
 
     public func getMagSafeLEDState() throws -> MagSafeLEDState {
-        guard hasACLC else { throw SMCAdapterError.magSafeNotSupported }
-
-        let raw: UInt8 = try SMCKit.shared.read("ACLC")
+        let raw = try getMagSafeLEDRawValue()
         guard let state = MagSafeLEDState(rawValue: raw) else {
             throw SMCAdapterError.unknownLEDState(raw)
         }
         return state
+    }
+
+    /// The value the LED key holds, which can be outside `MagSafeLEDState` (2 was read on an
+    /// M1 Pro under macOS 27).
+    public func getMagSafeLEDRawValue() throws -> UInt8 {
+        guard hasACLC else { throw SMCAdapterError.magSafeNotSupported }
+
+        return try SMCKit.shared.read("ACLC")
     }
 
     public func setMagSafeLEDState(_ state: MagSafeLEDState) throws {

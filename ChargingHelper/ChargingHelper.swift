@@ -69,12 +69,16 @@ final class ChargingHelper: NSObject, ChargingHelperProtocol {
                 reply(false, "Invalid MagSafe LED state: \(target)")
                 return
             }
-            // The SMC can report values outside MagSafeLEDState (2 was observed on an
-            // M1 Pro under macOS 27), which must not block writing a known state.
-            let currentState = try? adapter.getMagSafeLEDState()
-            if currentState != ledState {
+            // Compared as raw values, because the SMC can hold values outside
+            // MagSafeLEDState, and those must not block writing a known state.
+            let current = try? adapter.getMagSafeLEDRawValue()
+            if current != ledState.rawValue {
                 try adapter.setMagSafeLEDState(ledState)
-                logger.debug("SMC MagSafe LED set to: \(ledState.rawValue)")
+                // The app sends its color again every few seconds, so a write after the first
+                // one means something else changed the LED in between (macOS, or another
+                // charge limiter).
+                let previous = current.map { String($0) } ?? "unreadable"
+                logger.notice("SMC MagSafe LED set to \(ledState.rawValue) (was \(previous, privacy: .public))")
             }
             reply(true, nil)
         } catch {

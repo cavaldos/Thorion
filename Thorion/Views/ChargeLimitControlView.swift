@@ -85,62 +85,20 @@ struct ChargeLimitControlView: View {
             }
             slider
 
+            // The menu stays free of helper and 80% notices, which the user asked to drop.
+            // The helper is registered and repaired automatically, and Settings → Charging
+            // still explains the 80% floor and asks for approval when it is needed.
             if !manageCharging {
                 notice(
                     "Charge management is off",
                     buttonTitle: "Turn On…",
                     action: openChargingSettings
                 )
-            } else if ChargingHelperManager.shared.helperStatus != .installed {
-                // Without the helper, the LED and discharge commands fail silently.
-                notice(
-                    "Charging helper is not allowed",
-                    buttonTitle: "Allow…",
-                    action: { ChargingHelperManager.shared.openLoginItemsSettings() }
-                )
-            } else if !ChargingHelperManager.shared.isResponding {
-                // Registered but not starting, usually because the app was rebuilt or
-                // updated since the helper was registered.
-                notice(
-                    "Charging helper is not responding",
-                    buttonTitle: "Repair",
-                    action: { Task { await ChargingHelperManager.shared.repair() } }
-                )
             }
-
-            limitNote
         }
         .font(.system(size: 13))
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
-    }
-
-    // The slider lets the limit go below what macOS can hold, so say what really happens.
-    @ViewBuilder
-    private var limitNote: some View {
-        if manageCharging {
-            if heldLimit != displayedLimit {
-                note(
-                    automaticDischarge
-                        ? "macOS cannot hold the battery below 80%, so it keeps charging up to 80%."
-                        : "macOS cannot hold the battery below 80%, so it keeps charging up to 80%. Turn on Automatic discharge to hold it lower."
-                )
-            } else if ChargeLimitScale.isHeldByCuttingAdapter(
-                displayedLimit,
-                usingNativeChargeLimit: viewModel.usesNativeChargeLimit,
-                holdsByCuttingAdapter: holdsByCuttingAdapter)
-            {
-                note("Below 80%, Thorion holds the battery by running the Mac on battery between charges.")
-            }
-        }
-    }
-
-    private func note(_ message: LocalizedStringKey) -> some View {
-        Text(message)
-            .font(.system(size: 12))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .fixedSize(horizontal: false, vertical: true)
     }
 
     // MARK: Actions

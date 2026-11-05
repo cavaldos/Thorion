@@ -80,7 +80,7 @@ struct ChargePolicyTests {
         #expect(decision.indicator == .paused)
     }
 
-    @Test func automaticDischargeAboveTheLimitRunsOnBatteryWithABlinkingLED() {
+    @Test func automaticDischargeAboveTheLimitRunsOnBattery() {
         var policy = ChargePolicy()
         let decision = policy.decide(
             percentage: 85, temperature: 30, settings: settings(automaticDischarge: true))
@@ -190,7 +190,7 @@ struct ChargePolicyTests {
 
     // MARK: Force discharge
 
-    @Test func dischargeRunsOnBatteryWithABlinkingLED() {
+    @Test func dischargeRunsOnBattery() {
         var policy = ChargePolicy()
         let decision = policy.decide(
             percentage: 85, temperature: 30, settings: settings(forceDischarge: true))
@@ -374,7 +374,7 @@ struct ChargePolicyTests {
         #expect(decision.adapterEnabled)
     }
 
-    @Test func theDischargeButtonStillBlinksTheLEDWhileHolding() {
+    @Test func theDischargeButtonStillRunsOnBatteryWhileHolding() {
         var policy = ChargePolicy()
         let decision = policy.decide(
             percentage: 70, temperature: 30, settings: cuttingTheAdapter(forceDischarge: true))

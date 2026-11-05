@@ -58,6 +58,36 @@ final class NativeChargeLimitService {
         }
     }
 
+    /// The limit macOS is given for one charging decision, as a displayed percentage, the scale
+    /// powerd compares with.
+    ///
+    /// While charging it is the charge limit itself, so macOS stops there on its own, also
+    /// while the Mac sleeps and Thorion cannot step in. It used to be 100% whenever "Use
+    /// hardware percentage" was on, which let a sleeping Mac charge past the limit even though
+    /// macOS 27 publishes no separate hardware percentage (both read the same). Only when the
+    /// two really differ is macOS left at 100% and Thorion pauses charging itself.
+    static func limit(
+        charging: Bool,
+        chargeLimit: Int,
+        displayedPercentage: Int,
+        hardwarePercentage: Int,
+        usesHardwarePercentage: Bool
+    ) -> Int {
+        guard charging else {
+            // Holds the battery where it is.
+            return displayedPercentage
+        }
+        if chargeLimit < supportedRange.lowerBound {
+            // The battery is held by cutting the adapter at the limit. Should that ever fail,
+            // macOS still stops charging at the lowest limit it accepts.
+            return supportedRange.lowerBound
+        }
+        if usesHardwarePercentage, hardwarePercentage != displayedPercentage {
+            return supportedRange.upperBound
+        }
+        return chargeLimit
+    }
+
     var isAvailable: Bool { client != nil }
 
     /// Stops charging once the displayed state of charge reaches `percentage`. Values

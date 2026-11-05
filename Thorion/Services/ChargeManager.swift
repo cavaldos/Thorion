@@ -27,11 +27,29 @@ class ChargeManager {
     }
     private var lastEnforcement: Enforcement?
     private var lastNotifiedChargingState: Bool?
-    private var ledIsManaged = false
+    /// The color Thorion holds the MagSafe LED at, or nil while macOS controls it.
+    private var managedLEDState: MagSafeLEDState?
+    private var ledRefreshTask: Task<Void, Never>?
+    /// Until then the LED is checked every `ledSettlingRefreshInterval`, because macOS may
+    /// still be reacting to a charging change and write its own color.
+    private var ledSettlingDeadline: ContinuousClock.Instant?
     private var adapterDisconnectReportedAt: ContinuousClock.Instant?
     private var adapterDisconnectRecheck: Task<Void, Never>?
 
     private static let adapterDisconnectGracePeriod: Duration = .seconds(3)
+    /// The SMC keeps the LED color written last, and Thorion is not the only writer. macOS
+    /// writes its own color too: with the adapter plugged in and charging paused at the macOS
+    /// limit, the key read orange (04) although nothing else had run. Another charge limiter
+    /// also leaves its color behind when it quits (green was still set, with the adapter
+    /// unplugged, after AlDente had run). So the color is sent again at this interval while
+    /// the adapter is connected. The helper only writes when the SMC holds something else, so
+    /// a refresh costs one read.
+    private static let ledRefreshInterval: Duration = .seconds(10)
+    /// macOS starts or stops charging from about 2 to over 10 seconds after being asked (see
+    /// `BatteryService.pollWhileSettling`), and may set its own LED color when it does. For
+    /// this long after a charging change the LED is checked every `ledSettlingRefreshInterval`.
+    private static let ledSettlingDuration: Duration = .seconds(30)
+    private static let ledSettlingRefreshInterval: Duration = .seconds(2)
 
     private(set) var chargeLimitOverrideActive = false
     private(set) var forceDischargeActive = false
@@ -227,29 +245,22 @@ class ChargeManager {
                 "Charging decision: charging=\(decision.charging), adapter=\(decision.adapterEnabled), limit=\(decision.chargeLimit)% (\(decision.reason, privacy: .public))"
             )
             batteryService.pollWhileSettling()
+            // Restarted below by `updateLED`, so the next check comes after the short interval.
+            ledSettlingDeadline = ContinuousClock.now + Self.ledSettlingDuration
+            ledRefreshTask?.cancel()
+            ledRefreshTask = nil
         }
 
         let capabilities = batteryService.deviceCapabilities
 
         if capabilities.chargingControl {
-            // powerd compares its limit with the displayed percentage, so the native limit
-            // is always expressed in that scale. While charging it is set to the charge
-            // limit so macOS stops by itself even while the Mac sleeps; with hardware
-            // percentages the two scales differ, so Thorion pauses charging itself.
-            let lowestNativeLimit = NativeChargeLimitService.supportedRange.lowerBound
-            let nativeLimit: Int
-            if decision.charging {
-                if usesNativeChargeLimit, decision.chargeLimit < lowestNativeLimit {
-                    // The battery is held by cutting the adapter at the limit. Should that
-                    // ever fail, macOS still stops charging at the lowest limit it accepts.
-                    nativeLimit = lowestNativeLimit
-                } else {
-                    nativeLimit = Defaults[.useHardwarePercentage]
-                        ? NativeChargeLimitService.supportedRange.upperBound : decision.chargeLimit
-                }
-            } else {
-                nativeLimit = controlState.batteryPercentage
-            }
+            let nativeLimit = NativeChargeLimitService.limit(
+                charging: decision.charging,
+                chargeLimit: decision.chargeLimit,
+                displayedPercentage: controlState.batteryPercentage,
+                hardwarePercentage: controlState.hardwareBatteryPercentage,
+                usesHardwarePercentage: Defaults[.useHardwarePercentage]
+            )
             setCharging(enabled: decision.charging, nativeLimit: nativeLimit)
             sendChargingStateNotification(
                 charging: decision.charging, reason: decision.reason
@@ -267,28 +278,59 @@ class ChargeManager {
         updateSleepAssertion(shouldPreventSleep: shouldPreventSleep)
     }
 
-    /// Green while charging is paused, orange while charging, and blinking orange while
-    /// the Mac runs off the battery with the adapter connected.
+    /// Orange while charging, green once the battery is at or above the limit, including while
+    /// the Mac drains it down to the limit with the adapter connected.
     private func updateLED(_ indicator: ChargePolicy.Indicator) {
         guard Defaults[.manageMagSafeLED] else {
             // Hand the LED back to macOS once, rather than leaving the last color stuck.
-            if ledIsManaged {
-                ledIsManaged = false
+            if managedLEDState != nil {
+                stopManagingLED()
                 setLED(state: .reset)
             }
             return
         }
 
-        let state: MagSafeLEDState
-        switch indicator {
-        case .runningOnBattery: state = .blinkOrangeSlow
-        case .heatProtection: state = Defaults[.heatProtectionMagSafeLEDState]
-        case .charging: state = .orange
-        case .paused: state = .green
+        let state = indicator.ledState(heatProtection: Defaults[.heatProtectionMagSafeLEDState])
+        if state != managedLEDState {
+            logger.info("MagSafe LED: \(String(describing: state), privacy: .public)")
+            managedLEDState = state
         }
-
-        ledIsManaged = true
         setLED(state: state)
+        startRefreshingLED()
+    }
+
+    private func startRefreshingLED() {
+        guard ledRefreshTask == nil else { return }
+        ledRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                let delay = self?.ledRefreshDelay ?? Self.ledRefreshInterval
+                try? await Task.sleep(for: delay)
+                guard !Task.isCancelled, let self else { return }
+                // Commands to a helper that stopped answering only pile up. `evaluate` sends
+                // the color again once it answers.
+                guard let state = self.managedLEDState, ChargingHelperManager.shared.isWorking else {
+                    continue
+                }
+                self.setLED(state: state)
+            }
+        }
+    }
+
+    private var ledRefreshDelay: Duration {
+        if let ledSettlingDeadline, ContinuousClock.now < ledSettlingDeadline {
+            return Self.ledSettlingRefreshInterval
+        }
+        return Self.ledRefreshInterval
+    }
+
+    /// Stops holding the LED at a color. The caller hands it back to macOS.
+    private func stopManagingLED() {
+        if managedLEDState != nil {
+            logger.info("MagSafe LED: back to macOS")
+        }
+        managedLEDState = nil
+        ledRefreshTask?.cancel()
+        ledRefreshTask = nil
     }
 
     private func clearCachedState() {
@@ -303,6 +345,7 @@ class ChargeManager {
         isSailing = false
         lastManageChargingEnabled = false
         updateSleepAssertion(shouldPreventSleep: false)
+        stopManagingLED()
         if shouldRestoreNativeChargeLimit {
             restoreNativeChargeLimit()
         }
@@ -315,7 +358,6 @@ class ChargeManager {
             setAdapter(enabled: true)
         }
         if capabilities.hasMagSafe, capabilities.magsafeLEDControl {
-            ledIsManaged = false
             setLED(state: .reset)
         }
     }
@@ -353,7 +395,7 @@ class ChargeManager {
     }
 
     private func setLED(state: MagSafeLEDState) {
-        logger.info("Setting MagSafe LED: \(String(describing: state), privacy: .public)")
+        logger.debug("Sending MagSafe LED: \(String(describing: state), privacy: .public)")
         Task {
             do {
                 try await batteryService.manageMagsafeLED(target: state)
@@ -456,6 +498,8 @@ class ChargeManager {
         settingsObservation = nil
         adapterDisconnectRecheck?.cancel()
         adapterDisconnectRecheck = nil
+        ledRefreshTask?.cancel()
+        ledRefreshTask = nil
         updateSleepAssertion(shouldPreventSleep: false)
         restoreNativeChargeLimit()
     }

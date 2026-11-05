@@ -89,6 +89,36 @@ class ChargingHelperManager {
         }
     }
 
+    /// Whether macOS has no registration for the helper. It reports a lost registration as
+    /// `.notFound` rather than `.notRegistered` (seen on macOS 27.2: Background Task
+    /// Management answered "record not found"), and registering again worked.
+    private static func isUnregistered(_ status: SMAppService.Status) -> Bool {
+        status == .notRegistered || status == .notFound
+    }
+
+    /// Whether the helper has to be registered (again) before commands can reach it: macOS has
+    /// no registration for it, or keeps one that launchd can no longer start, which shows as
+    /// a helper that stopped answering. A helper waiting for approval in Login Items is left
+    /// alone, because registering it again would not approve it.
+    static func needsRegistration(status: SMAppService.Status, isResponding: Bool) -> Bool {
+        if isUnregistered(status) { return true }
+        return status == .enabled && !isResponding
+    }
+
+    /// Registers the helper again when macOS has lost its registration, which happens when the
+    /// app is moved or rebuilt at another path. Called at launch while charge management is
+    /// on. Without it every LED and adapter command timed out, and the menu could only point
+    /// at Login Items, where there was nothing to allow.
+    func registerIfMissing() {
+        guard Self.isUnregistered(service.status) else { return }
+        logger.warning("Charging helper is not registered, registering it again")
+        do {
+            try install()
+        } catch {
+            logger.error("Failed to register charging helper: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     func install() throws {
         logger.info("Registering charging helper daemon")
 
@@ -170,14 +200,22 @@ class ChargingHelperManager {
     }
 
     private func setResponding(_ responding: Bool) {
+        // An answer means the helper is allowed to run. The user may have just allowed it in
+        // Login Items, and the status is otherwise only read again when the menu opens, so
+        // the LED refresh and adapter cut (which need `isWorking`) stayed off until then.
+        if responding, helperStatus != .installed {
+            refreshStatus()
+        }
         guard isResponding != responding else { return }
         isResponding = responding
     }
 
     private func repairAutomaticallyIfNeeded() {
-        guard !hasAttemptedAutomaticRepair, service.status == .enabled else { return }
+        guard !hasAttemptedAutomaticRepair,
+            Self.needsRegistration(status: service.status, isResponding: false)
+        else { return }
         hasAttemptedAutomaticRepair = true
-        logger.warning("Charging helper is registered but does not respond, registering it again")
+        logger.warning("Charging helper does not respond, registering it again")
         Task { await repair() }
     }
 
@@ -185,10 +223,13 @@ class ChargingHelperManager {
     /// ask for approval in System Settings → Login Items afterwards.
     func repair() async {
         disconnect()
-        do {
-            try await service.unregister()
-        } catch {
-            logger.error("Failed to unregister charging helper: \(error.localizedDescription, privacy: .public)")
+        // A registration macOS has lost has nothing left to remove.
+        if !Self.isUnregistered(service.status) {
+            do {
+                try await service.unregister()
+            } catch {
+                logger.error("Failed to unregister charging helper: \(error.localizedDescription, privacy: .public)")
+            }
         }
         do {
             try install()
