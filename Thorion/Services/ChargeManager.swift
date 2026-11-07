@@ -51,6 +51,14 @@ class ChargeManager {
     private static let ledSettlingDuration: Duration = .seconds(30)
     private static let ledSettlingRefreshInterval: Duration = .seconds(2)
 
+    /// A manual test state that bypasses the charge policy: charge with an orange LED, or
+    /// pause charging with a green LED. Cleared on unplug or by `setTestMode(nil)`.
+    enum TestMode: Equatable {
+        case charge
+        case hold
+    }
+    private(set) var testMode: TestMode?
+
     private(set) var chargeLimitOverrideActive = false
     private(set) var forceDischargeActive = false
     private(set) var isSailing = false
@@ -178,6 +186,18 @@ class ChargeManager {
             clearCachedState()
         }
 
+        if let testMode {
+            guard adapterConnected else {
+                logger.info("Test mode ended: adapter unplugged")
+                self.testMode = nil
+                clearCachedState()
+                lastManageChargingEnabled = nil
+                return evaluate(controlState: controlState)
+            }
+            applyTestMode(testMode, controlState: controlState)
+            return
+        }
+
         guard Defaults[.manageCharging], adapterConnected else {
             if chargeLimitOverrideActive, !adapterConnected {
                 chargeLimitOverrideActive = false
@@ -276,6 +296,59 @@ class ChargeManager {
         let shouldPreventSleep = Defaults[.disableSleepUntilChargeLimit]
             && decision.charging
         updateSleepAssertion(shouldPreventSleep: shouldPreventSleep)
+    }
+
+    /// Sets or clears the manual test state. While it is set the charge policy is skipped.
+    func setTestMode(_ mode: TestMode?) {
+        guard mode != testMode else { return }
+        logger.info("Test mode: \(String(describing: mode), privacy: .public)")
+        testMode = mode
+        chargeLimitOverrideActive = false
+        forceDischargeActive = false
+        clearCachedState()
+        // Makes `evaluate` treat the next automatic pass as a fresh start.
+        lastManageChargingEnabled = nil
+        if mode == nil {
+            stopManagingLED()
+        }
+        evaluate(controlState: batteryService.controlState)
+    }
+
+    private func applyTestMode(_ mode: TestMode, controlState: BatteryControlState) {
+        let charging = mode == .charge
+        let enforcement = Enforcement(
+            charging: charging,
+            adapterEnabled: true,
+            chargeLimit: charging ? 100 : controlState.batteryPercentage
+        )
+        if enforcement != lastEnforcement {
+            lastEnforcement = enforcement
+            logger.info("Test mode decision: charging=\(charging)")
+            batteryService.pollWhileSettling()
+            ledSettlingDeadline = ContinuousClock.now + Self.ledSettlingDuration
+            ledRefreshTask?.cancel()
+            ledRefreshTask = nil
+        }
+
+        let capabilities = batteryService.deviceCapabilities
+        if capabilities.chargingControl {
+            // Paused: macOS holds the battery where it is (from 80% on a native-limit Mac).
+            setCharging(
+                enabled: charging,
+                nativeLimit: charging
+                    ? NativeChargeLimitService.supportedRange.upperBound : controlState.batteryPercentage)
+        }
+        if capabilities.adapterControl {
+            setAdapter(enabled: true)
+        }
+        if capabilities.hasMagSafe, capabilities.magsafeLEDControl {
+            // Forced even when "Manage MagSafe LED" is off, since this is what is being tested.
+            let state: MagSafeLEDState = charging ? .orange : .green
+            managedLEDState = state
+            setLED(state: state)
+            startRefreshingLED()
+        }
+        updateSleepAssertion(shouldPreventSleep: false)
     }
 
     /// Orange while charging, green once the battery is at or above the limit, including while

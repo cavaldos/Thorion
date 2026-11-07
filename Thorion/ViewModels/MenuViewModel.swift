@@ -146,6 +146,12 @@ class MenuViewModel {
         chargeManager.toggleForceDischarge()
     }
 
+    var testMode: ChargeManager.TestMode? { chargeManager.testMode }
+
+    func setTestMode(_ mode: ChargeManager.TestMode?) {
+        chargeManager.setTestMode(mode)
+    }
+
     private func updateFormattedValues(from metrics: BatteryMetrics, adapter: AdapterMetrics) {
         let useHardware = Defaults[.useHardwarePercentage]
         let percentage =

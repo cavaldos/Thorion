@@ -196,7 +196,7 @@ struct SettingsView: View {
             }
         case .advanced:
             SettingsPage(tab: tab) {
-                AdvancedSettingsView()
+                AdvancedSettingsView(viewModel: viewModel)
             }
         }
     }

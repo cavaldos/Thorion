@@ -347,6 +347,16 @@
         }
       }
     },
+    "Back to automatic" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Về tự động"
+          }
+        }
+      }
+    },
     "Battery" : {
       "localizations" : {
         "de" : {
@@ -637,6 +647,16 @@
         }
       }
     },
+    "Charge (orange LED)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sạc (đèn cam)"
+          }
+        }
+      }
+    },
     "Charge management is off" : {
       "localizations" : {
         "de" : {
@@ -677,6 +697,16 @@
         }
       }
     },
+    "Charging Test" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thử sạc"
+          }
+        }
+      }
+    },
     "Choose how Thorion appears in the menu bar." : {
       "localizations" : {
         "de" : {
@@ -713,6 +743,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "选择 Thorion 在菜单栏中的显示方式。"
+          }
+        }
+      }
+    },
+    "Connect the power adapter to use these buttons." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cắm sạc để dùng các nút này."
           }
         }
       }
@@ -2553,6 +2593,16 @@
         }
       }
     },
+    "Overrides the charge limit until you go back to automatic or unplug the adapter." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bỏ qua giới hạn sạc cho đến khi bạn bấm Về tự động hoặc rút sạc."
+          }
+        }
+      }
+    },
     "Pause charging when the battery temperature exceeds the threshold." : {
       "localizations" : {
         "de" : {
@@ -2763,6 +2813,16 @@
         }
       }
     },
+    "Repair" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sửa"
+          }
+        }
+      }
+    },
     "Show percentage next to icon" : {
       "localizations" : {
         "de" : {
@@ -2879,6 +2939,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "耗电较多的应用"
+          }
+        }
+      }
+    },
+    "Stop charging (green LED)" : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ngắt sạc (đèn xanh)"
           }
         }
       }
@@ -3069,6 +3139,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "启动"
+          }
+        }
+      }
+    },
+    "The charging helper is not running, so the LED cannot change color." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Charging helper không chạy nên đèn không đổi màu được."
+          }
+        }
+      }
+    },
+    "This Mac pauses charging through the macOS charge limit, so charging only stops from 80%." : {
+      "localizations" : {
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy này ngắt sạc qua giới hạn sạc của macOS, nên chỉ ngắt được từ 80% trở lên."
           }
         }
       }
