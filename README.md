@@ -49,7 +49,7 @@ brew install --cask cavaldos/tap/thorion
 xattr -dr com.apple.quarantine /Applications/thorion.app
 ```
 
-Then open Thorion from Applications. Thorion checks GitHub for new versions once a day and sends a notification when one is available (you can turn this off in **Settings → General**).
+Then open Thorion from Applications. Thorion checks for a new version once a day and sends a notification when one is available; click it to install the update in place (you can turn this off in **Settings → General**).
 
 Want to build from source or contribute? See [script/README.md](script/README.md).
 

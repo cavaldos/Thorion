@@ -35,7 +35,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             await setupServices()
             setupMenu()
             requestNotificationPermissions()
-            UpdateChecker.shared.startAutomaticChecks()
+            // Sparkle: daily update checks, download + install on the user's OK.
+            UpdateChecker.shared.start()
             LaunchAtLoginSuggestion.suggestIfNeeded()
         }
     }
@@ -135,12 +136,10 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let userInfo = response.notification.request.content.userInfo
-        if let urlString = userInfo[UpdateChecker.notificationURLKey] as? String,
-            let url = URL(string: urlString)
-        {
+        if response.notification.request.identifier == UpdateChecker.notificationIdentifier {
+            // Opens Sparkle's dialog for the update the notification announced.
             Task { @MainActor in
-                NSWorkspace.shared.open(url)
+                UpdateChecker.shared.checkForUpdates()
             }
         }
         completionHandler()

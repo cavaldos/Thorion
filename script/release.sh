@@ -1,7 +1,8 @@
 #!/bin/bash
 # Step 1: build the DMG, tag the commit and publish it as the LATEST GitHub Release.
 # Usage: ./script/release.sh vX.Y.Z   (e.g. ./script/release.sh v0.3.0)
-# Next:  ./script/notify-update.sh vX.Y.Z to bump the Homebrew cask.
+# Then the tag push runs CI's notify-users job, which publishes the Sparkle appcast and the
+# Homebrew cask (manual fallback: ./script/notify-update.sh vX.Y.Z).
 # Needs: gh (logged in), Xcode command line tools.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -31,7 +32,7 @@ fi
 git tag "$TAG"
 git push origin "$TAG"
 
-# Published as latest right away: installed apps see it on their next daily check.
+# Published as latest right away. Installed apps only see it once the appcast lists it.
 gh release create "$TAG" "$DMG_PATH" \
     --repo "$REPOSITORY" \
     --title "Thorion $TAG" \
@@ -40,4 +41,5 @@ gh release create "$TAG" "$DMG_PATH" \
 
 echo ""
 echo "Release $TAG published as latest: https://github.com/$REPOSITORY/releases/tag/$TAG"
-echo "Next, update Homebrew: ./script/notify-update.sh $TAG"
+echo "CI now publishes the Sparkle appcast and the Homebrew cask (job notify-users)."
+echo "If that job fails or its secrets are not set: ./script/notify-update.sh $TAG"

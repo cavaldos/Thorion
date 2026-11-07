@@ -2,7 +2,7 @@ name: Release
 
 # Push a tag like v0.3.0 → builds the DMG and publishes it as the LATEST GitHub Release.
 # Skipped when ./script/release.sh already published it, so the DMG (and the cask SHA-256) never changes.
-# Then run ./script/notify-update.sh vX.Y.Z to bump Homebrew.
+# Then notify-users publishes the Sparkle appcast (installed apps update) and the Homebrew cask.
 on:
   push:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
@@ -42,3 +42,49 @@ jobs:
               --generate-notes \
               --latest
           fi
+
+  # Publishes thorion/appcast.xml (Sparkle: installed apps see the update) and points the
+  # Homebrew cask at the new DMG. Needs three repo secrets:
+  #   SPARKLE_PRIVATE_KEY            EdDSA key matching SUPublicEDKey in Thorion/Info.plist (same key as Ice and Lumio)
+  #   MACOS_APP_RELEASES_DEPLOY_KEY  private half of a write deploy key on cavaldos/macos-app-releases
+  #   HOMEBREW_TAP_DEPLOY_KEY        private half of a write deploy key on cavaldos/homebrew-tap
+  # Manual fallback: ./script/notify-update.sh vX.Y.Z
+  notify-users:
+    needs: release
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Sparkle tools
+        env:
+          SPARKLE_VERSION: "2.10.1" # keep in sync with Package.resolved
+        run: |
+          mkdir -p "$RUNNER_TEMP/sparkle"
+          curl -fsSL "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz" \
+            | tar -xJ -C "$RUNNER_TEMP/sparkle"
+          echo "$RUNNER_TEMP/sparkle/bin" >> "$GITHUB_PATH"
+
+      - name: Publish appcast + Homebrew cask
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          RELEASES_KEY: ${{ secrets.MACOS_APP_RELEASES_DEPLOY_KEY }}
+          TAP_KEY: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+        run: |
+          if [ -z "$SPARKLE_KEY" ] || [ -z "$RELEASES_KEY" ] || [ -z "$TAP_KEY" ]; then
+            echo "::error::Set SPARKLE_PRIVATE_KEY, MACOS_APP_RELEASES_DEPLOY_KEY and HOMEBREW_TAP_DEPLOY_KEY, or run ./script/notify-update.sh $GITHUB_REF_NAME by hand"
+            exit 1
+          fi
+          KEYS="$RUNNER_TEMP/keys"
+          mkdir -m 700 "$KEYS"
+          trap 'rm -rf "$KEYS"' EXIT
+          printf '%s' "$SPARKLE_KEY" > "$KEYS/sparkle.pem"
+          printf '%s\n' "$RELEASES_KEY" > "$KEYS/releases"
+          printf '%s\n' "$TAP_KEY" > "$KEYS/tap"
+          chmod 600 "$KEYS"/*
+          # Pinned from https://api.github.com/meta
+          echo "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl" > "$KEYS/known_hosts"
+          SSH="ssh -o IdentitiesOnly=yes -o UserKnownHostsFile=$KEYS/known_hosts"
+          RELEASES_SSH="$SSH -i $KEYS/releases" HOMEBREW_TAP_SSH="$SSH -i $KEYS/tap" \
+            ./script/notify-update.sh "$GITHUB_REF_NAME" --key "$KEYS/sparkle.pem"

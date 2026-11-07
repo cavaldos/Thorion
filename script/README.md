@@ -54,19 +54,37 @@ python3 Resources/setup_icons.py path/to.png  # or any other image
 
 It regenerates every size in `Thorion/Assets.xcassets/AppIcon.appiconset` (16 → 1024 px) and rewrites `Contents.json`. It only uses macOS's built-in `sips`, so no Python packages are needed.
 
-## Every release (2 commands)
+## Every release
 
 ```bash
-# 1. Commit your work, then build the DMG, tag, and publish it as the LATEST release
+# Commit your work, then build the DMG, tag, and publish it as the LATEST release
 ./script/release.sh vX.Y.Z
-
-# 2. Bump the Homebrew cask
-./script/notify-update.sh vX.Y.Z
 ```
 
-- **Step 1 publishes the release as Latest** (same as Ice). Installed apps check `releases/latest` on GitHub once a day and show a notification that links to the download.
-- **Step 2 updates Homebrew.** It also publishes the release if it is still a draft (e.g. old drafts).
-  It writes `Casks/thorion.rb` in `cavaldos/homebrew-tap` with the new version and SHA-256, so `brew upgrade` picks it up. Pass `--skip-brew` to skip it.
+- **`release.sh` publishes the GitHub Release as Latest** and pushes the tag.
+- **The tag push runs `.github/workflows/release.yml`.** Its `notify-users` job runs `./script/notify-update.sh`, which:
+  1. adds the release to [`thorion/appcast.xml`](https://cavaldos.github.io/macos-app-releases/thorion/appcast.xml) in [`cavaldos/macos-app-releases`](https://github.com/cavaldos/macos-app-releases) (the Sparkle feed shared with Ice and Lumio), signed with the EdDSA key;
+  2. writes `Casks/thorion.rb` in `cavaldos/homebrew-tap` with the new version and SHA-256, so `brew upgrade` picks it up.
+- If the job fails or its secrets are not set, run `./script/notify-update.sh vX.Y.Z` yourself (needs `generate_appcast`: `brew install --cask sparkle`, and the key in `~/.sparkle/sparkle-priv.pem` or your Keychain). Pass `--skip-brew` to skip Homebrew.
+
+### How users get the update
+
+Thorion uses [Sparkle](https://sparkle-project.org). Release builds read `SUFeedURL` in `Thorion/Info.plist` and check the feed once a day:
+
+- **A new version found in the background** shows a macOS notification. Clicking it (or **Install…** in Settings → General) opens Sparkle's dialog with the release notes; Sparkle downloads the DMG, verifies it against `SUPublicEDKey`, installs it and relaunches Thorion.
+- **Right after launch**, or when notifications are off or not allowed, Sparkle shows its dialog directly.
+- **Check Now** in Settings → General checks right away.
+- Debug builds (`./script/run.sh`) never check, so they are not replaced by a release build.
+
+Versions released before Sparkle (v0.0.2 and older) still check GitHub's `releases/latest` and link to the download, so they see the next release too and move to Sparkle after installing it.
+
+### CI secrets (repo Settings → Secrets → Actions)
+
+| Secret | What it is |
+| --- | --- |
+| `SPARKLE_PRIVATE_KEY` | Contents of `~/.sparkle/sparkle-priv.pem` (the EdDSA key shared with Ice and Lumio) |
+| `MACOS_APP_RELEASES_DEPLOY_KEY` | Private half of a deploy key with write access on `cavaldos/macos-app-releases` |
+| `HOMEBREW_TAP_DEPLOY_KEY` | Private half of a deploy key with write access on `cavaldos/homebrew-tap` |
 
 ### Tag rules
 
@@ -76,9 +94,10 @@ It regenerates every size in `Thorion/Assets.xcassets/AppIcon.appiconset` (16 �
 
 ### No update notification? Check
 
-1. Is the release published (not draft) and marked **Latest** on GitHub?
-2. Is **Settings → General → Automatically check for updates** on, and notifications allowed for Thorion in System Settings?
-3. The check runs at launch and every 24 hours — use **Check Now** in Settings to test right away.
+1. Does [`thorion/appcast.xml`](https://cavaldos.github.io/macos-app-releases/thorion/appcast.xml) list the new version? If not, check the `notify-users` job or run `./script/notify-update.sh vX.Y.Z`.
+2. Is the installed app a Release build with a lower version? Debug builds never check.
+3. Is **Settings → General → Automatically check for updates** on? Without notification permission Sparkle shows its dialog instead.
+4. Sparkle checks once every 24 hours — use **Check Now** in Settings to test right away.
 
 ## Contributing
 

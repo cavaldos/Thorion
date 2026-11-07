@@ -85,10 +85,6 @@ extension Defaults.Keys {
     /// Set by "Don't ask again" on the suggestion to add Thorion to Login Items.
     static let skipLaunchAtLoginSuggestion = Key<Bool>("skipLaunchAtLoginSuggestion", default: false)
 
-    // Updates
-    static let automaticallyCheckForUpdates = Key<Bool>("automaticallyCheckForUpdates", default: true)
-    static let lastNotifiedUpdateVersion = Key<String?>("lastNotifiedUpdateVersion")
-
     // Status Icon
     static let statusIconStyle = Key<StatusIconStyle>("statusIconStyle", default: .macOS26Colored)
     static let showPercentageNextToIcon = Key<Bool>("showPercentageNextToIcon", default: true)

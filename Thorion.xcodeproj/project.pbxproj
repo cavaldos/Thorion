@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		5EF859C85D209CAA68ACC224 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FB83B3037CE0C6604019EF1B /* Cocoa.framework */; };
 		A6638F812F1C0FD60047FA8E /* Defaults in Frameworks */ = {isa = PBXBuildFile; productRef = A6638F802F1C0FD60047FA8E /* Defaults */; };
+		A6F5A0032F50000000000001 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = A6F5A0022F50000000000001 /* Sparkle */; };
 		A66D62D92F44069300B996E7 /* smc_power.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A66D62CE2F44067C00B996E7 /* smc_power.framework */; };
 		A66D62DD2F44069900B996E7 /* smc_power.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A66D62CE2F44067C00B996E7 /* smc_power.framework */; };
 		A66D62E22F44076F00B996E7 /* SMCKit in Frameworks */ = {isa = PBXBuildFile; productRef = A66D62E12F44076F00B996E7 /* SMCKit */; };
@@ -124,6 +125,13 @@
 			);
 			target = A68B3E0B2F19AB4B00F115E4 /* thorion */;
 		};
+		A6F5A0042F50000000000001 /* Exceptions for "Thorion" folder in "thorion" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A68B3E0B2F19AB4B00F115E4 /* thorion */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -144,6 +152,7 @@
 		A68B3E0E2F19AB4B00F115E4 /* Thorion */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				A6F5A0042F50000000000001 /* Exceptions for "Thorion" folder in "thorion" target */,
 			);
 			path = Thorion;
 			sourceTree = "<group>";
@@ -181,6 +190,7 @@
 			files = (
 				A6AE19892F480D41003B09FA /* smc_power.framework in Frameworks */,
 				A6638F812F1C0FD60047FA8E /* Defaults in Frameworks */,
+				A6F5A0032F50000000000001 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -336,6 +346,7 @@
 			name = thorion;
 			packageProductDependencies = (
 				A6638F802F1C0FD60047FA8E /* Defaults */,
+				A6F5A0022F50000000000001 /* Sparkle */,
 			);
 			productName = thorion;
 			productReference = A68B3E0C2F19AB4B00F115E4 /* thorion.app */;
@@ -423,6 +434,7 @@
 			packageReferences = (
 				A6638F7F2F1C0FD60047FA8E /* XCRemoteSwiftPackageReference "Defaults" */,
 				A6ECE4EC2F39E247007F3EDF /* XCRemoteSwiftPackageReference "SMCKit" */,
+				A6F5A0012F50000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A68B3E0D2F19AB4B00F115E4 /* Products */;
@@ -806,6 +818,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Thorion/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Thorion;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -842,6 +855,7 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Thorion/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Thorion;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -1079,6 +1093,14 @@
 				kind = branch;
 			};
 		};
+		A6F5A0012F50000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1091,6 +1113,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A6ECE4EC2F39E247007F3EDF /* XCRemoteSwiftPackageReference "SMCKit" */;
 			productName = SMCKit;
+		};
+		A6F5A0022F50000000000001 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A6F5A0012F50000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

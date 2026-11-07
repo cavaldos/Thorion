@@ -1,157 +1,188 @@
 import AppKit
+import Combine
 import Defaults
 import Foundation
 import Observation
+import Sparkle
 import UserNotifications
 import os.log
 
-/// Checks GitHub Releases for a newer Thorion version and notifies the user.
+/// Self-updates through Sparkle, set up like Ice and Lumio. Sparkle reads the feed named by
+/// `SUFeedURL` in Info.plist (published to cavaldos/macos-app-releases by
+/// script/notify-update.sh after each release), checks it once a day, verifies the download
+/// against `SUPublicEDKey`, then installs it and relaunches Thorion.
+///
+/// A background check that finds an update posts a notification instead of opening a window
+/// over the user's work; clicking it (or "Install…" in Settings) shows Sparkle's update dialog.
+///
+/// Off in Debug builds: an update would replace them with the release build.
 @MainActor
 @Observable
-final class UpdateChecker {
+final class UpdateChecker: NSObject {
     static let shared = UpdateChecker()
 
-    enum Status: Equatable {
-        case idle
-        case checking
-        case upToDate
-        case available(version: String, downloadURL: URL)
-        case failed(message: String)
+    nonisolated static let notificationIdentifier = "updateAvailable"
+
+    /// False for Debug builds.
+    let isEnabled: Bool
+
+    /// False while a check or an update is already in progress.
+    private(set) var canCheckForUpdates = false
+
+    /// The update a background check found and the user has not opened yet.
+    private(set) var pendingUpdateVersion: String?
+
+    private(set) var lastUpdateCheckDate: Date?
+
+    /// Mirrors Sparkle's setting (stored by Sparkle in the `SUEnableAutomaticChecks` default).
+    var automaticallyChecksForUpdates = false {
+        didSet {
+            guard let updater = controller?.updater,
+                updater.automaticallyChecksForUpdates != automaticallyChecksForUpdates
+            else { return }
+            updater.automaticallyChecksForUpdates = automaticallyChecksForUpdates
+        }
     }
 
-    static let releasesPageURL = URL(string: "https://github.com/cavaldos/Thorion/releases/latest")
-    private static let latestReleaseAPIURL = URL(
-        string: "https://api.github.com/repos/cavaldos/Thorion/releases/latest")
-    private static let automaticCheckInterval: Duration = .seconds(24 * 60 * 60)
-    nonisolated static let notificationURLKey = "downloadURL"
+    @ObservationIgnored private var controller: SPUStandardUpdaterController?
+    @ObservationIgnored private var cancellables: Set<AnyCancellable> = []
+    @ObservationIgnored private let logger = Logger(subsystem: "com.thorion.app", category: "UpdateChecker")
 
-    private(set) var status: Status = .idle
-    private var automaticCheckTask: Task<Void, Never>?
-
-    private let logger = Logger(subsystem: "com.thorion.app", category: "UpdateChecker")
-
-    private init() {}
+    private override init() {
+        #if DEBUG
+            isEnabled = false
+        #else
+            isEnabled = true
+        #endif
+        super.init()
+    }
 
     var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
     }
 
-    func startAutomaticChecks() {
-        automaticCheckTask?.cancel()
-        automaticCheckTask = Task { [weak self] in
-            while !Task.isCancelled {
-                if Defaults[.automaticallyCheckForUpdates] {
-                    await self?.checkForUpdates(userInitiated: false)
-                }
-                try? await Task.sleep(for: Self.automaticCheckInterval)
-            }
-        }
+    /// Starts Sparkle's scheduled checks. Call once at launch.
+    func start() {
+        guard isEnabled, controller == nil else { return }
+        Self.migrateLegacySettings(in: .standard)
+
+        let controller = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: self
+        )
+        self.controller = controller
+
+        let updater = controller.updater
+        updater.publisher(for: \.canCheckForUpdates)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.canCheckForUpdates = $0 }
+            .store(in: &cancellables)
+        updater.publisher(for: \.lastUpdateCheckDate)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.lastUpdateCheckDate = $0 }
+            .store(in: &cancellables)
+        updater.publisher(for: \.automaticallyChecksForUpdates)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.automaticallyChecksForUpdates = $0 }
+            .store(in: &cancellables)
     }
 
-    func checkForUpdates(userInitiated: Bool) async {
-        guard status != .checking else { return }
-        status = .checking
+    /// "Check for Updates" and "Install…": Sparkle shows the result, or brings a pending
+    /// update to the front.
+    func checkForUpdates() {
+        guard let controller else { return }
+        // Thorion is a menu bar (LSUIElement) app: Sparkle's windows only take input while
+        // it is active.
+        NSApp.activate(ignoringOtherApps: true)
+        controller.updater.checkForUpdates()
+    }
 
-        do {
-            let release = try await fetchLatestRelease()
-            let latestVersion = Self.normalizedVersion(release.tagName)
+    /// Before Sparkle, Thorion kept its own "check automatically" switch. Carry a switched-off
+    /// value over to Sparkle's setting once, then drop the old keys.
+    static func migrateLegacySettings(in defaults: UserDefaults) {
+        let legacyKey = "automaticallyCheckForUpdates"
+        if defaults.object(forKey: legacyKey) as? Bool == false,
+            defaults.object(forKey: "SUEnableAutomaticChecks") == nil
+        {
+            defaults.set(false, forKey: "SUEnableAutomaticChecks")
+        }
+        defaults.removeObject(forKey: legacyKey)
+        defaults.removeObject(forKey: "lastNotifiedUpdateVersion")
+    }
 
-            guard Self.isVersion(latestVersion, newerThan: currentVersion) else {
-                status = .upToDate
+    private func postUpdateNotification(version: String) {
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let settings = await center.notificationSettings()
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+            else {
+                // Without notifications the update would go unnoticed: show Sparkle's dialog.
+                logger.info("Notifications are not allowed, showing the update dialog instead")
+                checkForUpdates()
                 return
             }
 
-            status = .available(version: latestVersion, downloadURL: release.htmlURL)
+            let content = UNMutableNotificationContent()
+            content.title = String(localized: "Thorion \(version) is available")
+            content.body = String(
+                localized: "You are using version \(currentVersion). Click to install the update.")
+            content.sound = .default
 
-            // Background checks run daily; only notify once per new version.
-            if userInitiated || Defaults[.lastNotifiedUpdateVersion] != latestVersion {
-                Defaults[.lastNotifiedUpdateVersion] = latestVersion
-                sendUpdateNotification(version: latestVersion, downloadURL: release.htmlURL)
-            }
-        } catch {
-            logger.error("Update check failed: \(error)")
-            status = .failed(message: error.localizedDescription)
-        }
-    }
-
-    private struct Release: Decodable {
-        let tagName: String
-        let htmlURL: URL
-
-        enum CodingKeys: String, CodingKey {
-            case tagName = "tag_name"
-            case htmlURL = "html_url"
-        }
-    }
-
-    private enum UpdateCheckError: LocalizedError {
-        case invalidConfiguration
-        case badResponse(statusCode: Int)
-
-        var errorDescription: String? {
-            switch self {
-            case .invalidConfiguration:
-                String(localized: "The update server address is invalid.")
-            case .badResponse(let statusCode):
-                String(localized: "GitHub returned an unexpected response (HTTP \(statusCode)).")
-            }
-        }
-    }
-
-    private func fetchLatestRelease() async throws -> Release {
-        guard let url = Self.latestReleaseAPIURL else {
-            throw UpdateCheckError.invalidConfiguration
-        }
-
-        var request = URLRequest(url: url)
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.cachePolicy = .reloadIgnoringLocalCacheData
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-            throw UpdateCheckError.badResponse(statusCode: httpResponse.statusCode)
-        }
-        return try JSONDecoder().decode(Release.self, from: data)
-    }
-
-    private func sendUpdateNotification(version: String, downloadURL: URL) {
-        guard !Defaults[.disableNotifications] else { return }
-
-        let content = UNMutableNotificationContent()
-        content.title = String(localized: "Thorion \(version) is available")
-        content.body = String(localized: "You are using version \(currentVersion). Click to download the update.")
-        content.sound = .default
-        content.userInfo = [Self.notificationURLKey: downloadURL.absoluteString]
-
-        let request = UNNotificationRequest(
-            identifier: "updateAvailable",
-            content: content,
-            trigger: nil
-        )
-
-        UNUserNotificationCenter.current().add(request) { [logger] error in
-            if let error {
+            let request = UNNotificationRequest(
+                identifier: Self.notificationIdentifier,
+                content: content,
+                trigger: nil
+            )
+            do {
+                try await center.add(request)
+            } catch {
                 logger.error("Failed to deliver update notification: \(error)")
             }
         }
     }
 
-    static func normalizedVersion(_ tag: String) -> String {
-        tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
+    private func removeUpdateNotification() {
+        let center = UNUserNotificationCenter.current()
+        center.removeDeliveredNotifications(withIdentifiers: [Self.notificationIdentifier])
+        center.removePendingNotificationRequests(withIdentifiers: [Self.notificationIdentifier])
+    }
+}
+
+// Gentle reminders: https://sparkle-project.org/documentation/gentle-reminders
+extension UpdateChecker: @preconcurrency SPUStandardUserDriverDelegate {
+    var supportsGentleScheduledUpdateReminders: Bool { true }
+
+    /// Right after launch Sparkle shows its dialog in focus; at any other time Thorion posts a
+    /// notification instead, unless the user turned notifications off in Settings.
+    func standardUserDriverShouldHandleShowingScheduledUpdate(
+        _ update: SUAppcastItem,
+        andInImmediateFocus immediateFocus: Bool
+    ) -> Bool {
+        immediateFocus || Defaults[.disableNotifications]
     }
 
-    static func isVersion(_ candidate: String, newerThan current: String) -> Bool {
-        let candidateParts = candidate.split(separator: ".").map { Int($0) ?? 0 }
-        let currentParts = current.split(separator: ".").map { Int($0) ?? 0 }
-        let length = max(candidateParts.count, currentParts.count)
+    func standardUserDriverWillHandleShowingUpdate(
+        _ handleShowingUpdate: Bool,
+        forUpdate update: SUAppcastItem,
+        state: SPUUserUpdateState
+    ) {
+        pendingUpdateVersion = update.displayVersionString
 
-        for index in 0..<length {
-            let candidatePart = index < candidateParts.count ? candidateParts[index] : 0
-            let currentPart = index < currentParts.count ? currentParts[index] : 0
-            if candidatePart != currentPart {
-                return candidatePart > currentPart
-            }
+        if handleShowingUpdate {
+            // Sparkle's alert can only take input while the app is active.
+            NSApp.activate(ignoringOtherApps: true)
+        } else if !state.userInitiated {
+            postUpdateNotification(version: update.displayVersionString)
         }
-        return false
+    }
+
+    func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
+        removeUpdateNotification()
+    }
+
+    func standardUserDriverWillFinishUpdateSession() {
+        pendingUpdateVersion = nil
+        removeUpdateNotification()
     }
 }

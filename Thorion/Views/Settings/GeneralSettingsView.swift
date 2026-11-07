@@ -50,55 +50,50 @@ struct GeneralSettingsView: View {
 }
 
 private struct UpdateSettingsSection: View {
-    @Default(.automaticallyCheckForUpdates) var automaticallyCheckForUpdates
-    private let updateChecker = UpdateChecker.shared
+    @Bindable private var updateChecker = UpdateChecker.shared
 
     var body: some View {
         Section {
-            Toggle("Automatically check for updates", isOn: $automaticallyCheckForUpdates)
+            if updateChecker.isEnabled {
+                Toggle("Automatically check for updates", isOn: $updateChecker.automaticallyChecksForUpdates)
 
-            HStack {
-                statusView
-                Spacer()
-                Button("Check Now") {
-                    Task {
-                        await updateChecker.checkForUpdates(userInitiated: true)
+                HStack {
+                    statusView
+                    Spacer()
+                    if updateChecker.pendingUpdateVersion != nil {
+                        Button("Install…") {
+                            updateChecker.checkForUpdates()
+                        }
+                    } else {
+                        Button("Check Now") {
+                            updateChecker.checkForUpdates()
+                        }
+                        .disabled(!updateChecker.canCheckForUpdates)
                     }
                 }
-                .disabled(updateChecker.status == .checking)
+            } else {
+                Text("Updates are off in Debug builds.")
+                    .foregroundStyle(.secondary)
             }
         } header: {
             SettingsSectionHeader(
                 title: "Updates",
-                description: "Thorion \(updateChecker.currentVersion) checks GitHub Releases once a day."
+                description:
+                    "Thorion \(updateChecker.currentVersion) checks for a new version once a day and installs it when you agree."
             )
         }
     }
 
     @ViewBuilder
     private var statusView: some View {
-        switch updateChecker.status {
-        case .idle:
+        if let version = updateChecker.pendingUpdateVersion {
+            Text("Version \(version) is available")
+        } else if let lastCheck = updateChecker.lastUpdateCheckDate {
+            Text("Last checked \(lastCheck, format: .relative(presentation: .named))")
+                .foregroundStyle(.secondary)
+        } else {
             Text("Not checked yet")
                 .foregroundStyle(.secondary)
-        case .checking:
-            HStack(spacing: 6) {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Checking…")
-                    .foregroundStyle(.secondary)
-            }
-        case .upToDate:
-            Text("Thorion is up to date")
-                .foregroundStyle(.secondary)
-        case .available(let version, let downloadURL):
-            HStack(spacing: 6) {
-                Text("Version \(version) is available")
-                Link("Download", destination: downloadURL)
-            }
-        case .failed(let message):
-            Text("Update check failed: \(message)")
-                .foregroundStyle(.red)
         }
     }
 }
